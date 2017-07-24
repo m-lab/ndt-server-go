@@ -1,6 +1,8 @@
 package main
 
 import (
+	"bufio"
+	"encoding/binary"
 	"fmt"
 	"net"
 	"os"
@@ -15,19 +17,53 @@ const (
 	TYPE = "tcp"
 )
 
+type TestCode int
+
+const (
+	TestMid TestCode = 1 << iota
+	TestC2S
+	TestS2C
+	TestSFW
+	TestStatus
+	TestMeta
+)
+
+type NDTMessage11 struct {
+	Code   byte
+	Length int16
+	Tests  byte
+}
+
 func handleRequest(conn net.Conn) {
-	// Make a buffer to hold incoming data.
-	buf := make([]byte, 1024)
+	defer conn.Close()
+	rdr := bufio.NewReader(conn)
+
+	var msg11 NDTMessage11
+	binary.Read(rdr, binary.BigEndian, &msg11)
+
+	fmt.Println(msg11)
 	// Read the incoming connection into the buffer.
-	reqLen, err := conn.Read(buf)
-	if err != nil {
-		fmt.Println("Error reading:", err.Error())
+	count := 0
+	buf := make([]byte, 1024)
+	for {
+		reqLen, err := conn.Read(buf)
+		if (reqLen+count) > 3 && count < 4 {
+			tests := buf[3-count]
+			if tests&byte(TestMid) > 0 {
+				fmt.Println("TestMid")
+			}
+			fmt.Printf("%b\n", buf[3-count])
+		}
+		if err != nil {
+			fmt.Println("Error reading:", err.Error())
+			return
+		}
+		fmt.Println(buf[:reqLen])
+
 	}
-	fmt.Println(string(buf[:reqLen]))
 	// Send a response back to person contacting us.
-	conn.Write([]byte("Message received."))
+	conn.Write([]byte("Message received.\n"))
 	// Close the connection when you're done with it.
-	conn.Close()
 }
 
 func main() {
