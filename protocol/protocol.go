@@ -9,14 +9,12 @@ MSG_EXTENDED_LOGIN uses binary message types, but json message bodies.
 */
 
 import (
-	"bufio"
 	"bytes"
 	"encoding/binary"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
-	"net"
 	"os"
 	"strconv"
 )
@@ -39,6 +37,30 @@ type header struct {
 	Length  int16
 }
 
+// Message contains a header and arbitrary content.
+type Message struct {
+	// Header contains the message type and length
+	Header header
+	// Content contains the message body, which may be json or binary.
+	Content []byte
+}
+
+func ReadMessage(rdr io.Reader) (Message, error) {
+	fmt.Println("reading header")
+	var hdr header
+	err := binary.Read(rdr, binary.BigEndian, &hdr)
+	if err != nil {
+		return Message{}, err
+	}
+	content := make([]byte, hdr.Length)
+	fmt.Println("reading body")
+	err = binary.Read(rdr, binary.BigEndian, content)
+	if err != nil {
+		return Message{}, err
+	}
+	return Message{hdr, content}, nil
+}
+
 type loginJSON struct {
 	Msg   string
 	Tests string
@@ -51,48 +73,22 @@ type Login struct {
 	IsExtended bool   // Type 11
 }
 
-// Read reads an unknown message type from the buffer.
-func Read(rdr *bufio.Reader) error {
-	fmt.Println("reading header")
-	var hdr header
-	err := binary.Read(rdr, binary.BigEndian, &hdr)
-	if err != nil {
-		return err
-	}
-	fmt.Println(hdr)
-	content := make([]byte, hdr.Length)
-	fmt.Println("reading body")
-	err = binary.Read(rdr, binary.BigEndian, content)
-	if err != nil {
-		return err
-	}
-	fmt.Println(string(content))
-	return nil
-}
-
 // ReadLogin reads the initial login message.
-func ReadLogin(rdr io.Reader) (*Login, error) {
-	fmt.Println("reading header")
-	var hdr header
-	err := binary.Read(rdr, binary.BigEndian, &hdr)
+func ReadLogin(rdr io.Reader) (Login, error) {
+	msg, err := ReadMessage(rdr)
 	if err != nil {
-		return nil, err
+		return Login{}, err
 	}
-	content := make([]byte, hdr.Length)
-	fmt.Println("reading body")
-	err = binary.Read(rdr, binary.BigEndian, content)
-	if err != nil {
-		return nil, err
-	}
-	switch hdr.MsgType {
+
+	switch msg.Header.MsgType {
 	case byte(2):
-		os.Exit(11)
-	// Handle legacy, without json
+		// TODO Handle legacy, without json
+		panic("Not implemented")
 
 	case byte(11):
 		// Handle extended, with json
 		lj := loginJSON{"foo", "bar"}
-		err := json.Unmarshal(content, &lj)
+		err := json.Unmarshal(msg.Content, &lj)
 		if err != nil {
 			fmt.Println("Error: ", err)
 		}
@@ -100,33 +96,10 @@ func ReadLogin(rdr io.Reader) (*Login, error) {
 		if err != nil {
 			fmt.Println("Error: ", err)
 		}
-		return &Login{byte(tests), lj.Msg, true}, nil
+		return Login{byte(tests), lj.Msg, true}, nil
 	default:
 	}
-	return nil, errors.New("Error")
-}
-
-// Message contains a header and arbitrary content.
-type Message struct {
-	// Header contains the message type and length
-	Header header
-	// Content contains the message body, which may be json or binary.
-	Content []byte
-}
-
-func (msg *Message) Read(rdr io.Reader) error {
-	fmt.Println("reading header")
-	err := binary.Read(rdr, binary.BigEndian, &msg.Header)
-	if err != nil {
-		return err
-	}
-	msg.Content = make([]byte, msg.Header.Length)
-	fmt.Println("reading body")
-	err = binary.Read(rdr, binary.BigEndian, msg.Content)
-	if err != nil {
-		return err
-	}
-	return nil
+	return Login{}, errors.New("Error")
 }
 
 // SimpleMsg helps encoding json messages.
@@ -135,7 +108,7 @@ type SimpleMsg struct {
 }
 
 // Send sends a raw message to the client.
-func Send(conn net.Conn, t byte, msg []byte) {
+func Send(conn io.Writer, t byte, msg []byte) {
 	buf := make([]byte, 0, 3+len(msg))
 	w := bytes.NewBuffer(buf)
 	binary.Write(w, binary.BigEndian, t)
@@ -145,7 +118,7 @@ func Send(conn net.Conn, t byte, msg []byte) {
 }
 
 // SendJSON sends a json encoded message to the client.
-func SendJSON(conn net.Conn, t byte, msg interface{}) {
+func SendJSON(conn io.Writer, t byte, msg interface{}) {
 	j, err := json.Marshal(msg)
 	if err != nil {
 		fmt.Println(err)
