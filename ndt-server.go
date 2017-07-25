@@ -12,6 +12,7 @@ import (
 	"fmt"
 	"net"
 	"os"
+	"sync"
 
 	"github.com/m-lab/ndt-server-go/protocol"
 	"github.com/m-lab/ndt-server-go/tests"
@@ -26,32 +27,9 @@ const (
 	TYPE = "tcp"
 )
 
-func handleRequest(conn net.Conn) {
-	// Close the connection when you're done with it.
-	defer conn.Close()
-	rdr := bufio.NewReader(conn)
-
-	login, err := protocol.ReadLogin(rdr)
-	if err != nil {
-		fmt.Println(err)
-		return
-	}
-
-	fmt.Println(*login)
-	// Kickoff message
-	conn.Write([]byte("123456 654321"))
-	// Read the incoming connection into the buffer.
-	// Send a response back to person contacting us.
-	// Write(conn, 1, "{\"msg\":\"9977\"}")
-
-	protocol.SendJSON(conn, 1, protocol.SimpleMsg{"0"})
-	//Write(conn, 1, "{\"msg\":\"0\"}")
-	protocol.SendJSON(conn, 2, protocol.SimpleMsg{"v3.8.1"})
-
-	protocol.SendJSON(conn, 2, protocol.SimpleMsg{"1 2 4 8 32"})
-	//conn.Write([]byte{1, 4, '9', '9', '7', '7'})
-	//conn.Write([]byte{1, 1, '0'})
-
+// returns the port for the middlebox test.
+func startMiddleBox() (string, *sync.WaitGroup) {
+	// Handle the MiddleBox test.
 	mbox, err := net.Listen("tcp", "localhost:0")
 	if err != nil {
 		fmt.Println("Error listening:", err.Error())
@@ -59,12 +37,42 @@ func handleRequest(conn net.Conn) {
 	}
 
 	_, port, err := net.SplitHostPort(mbox.Addr().String())
-	done := make(chan bool, 1)
-	go tests.MiddleBox(mbox, done)
+	var wg sync.WaitGroup
+	wg.Add(1)
+	go tests.MiddleBox(mbox, &wg)
+	return port, &wg
+}
 
+func handleRequest(conn net.Conn) {
+	// Close the connection when you're done with it.
+	defer conn.Close()
+	rdr := bufio.NewReader(conn)
+
+	// Read the incoming login message.
+	login, err := protocol.ReadLogin(rdr)
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
+
+	fmt.Println(login)
+	// Send "Kickoff" message
+	conn.Write([]byte("123456 654321"))
+	// Send next messages in the handshake.
+	protocol.SendJSON(conn, 1, protocol.SimpleMsg{"0"})
+	protocol.SendJSON(conn, 2, protocol.SimpleMsg{"v3.8.1"})
+
+	// TODO - this should be in response to the actual request.
+	protocol.SendJSON(conn, 2, protocol.SimpleMsg{"1 2 4 8 32"})
+
+	port, wg := startMiddleBox()
+
+	// Send the TEST_PREPARE message.
 	protocol.SendJSON(conn, 3, protocol.SimpleMsg{port})
+	wg.Wait()
+	fmt.Println("Middlebox done")
 
-	err = protocol.Read(rdr)
+	protocol.ReadMessage(rdr)
 }
 
 func main() {
