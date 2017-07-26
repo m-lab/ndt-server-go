@@ -51,8 +51,9 @@ func handleRequest(conn net.Conn) {
 	protocol.SendJSON(conn, 2, protocol.SimpleMsg{"1"})
 
 	tests.DoMiddleBox(conn)
-
-	protocol.ReadMessage(rdr)
+	protocol.SendJSON(conn, 8, protocol.SimpleMsg{"Results 1"})
+	protocol.SendJSON(conn, 8, protocol.SimpleMsg{"...Results 2"})
+	protocol.Send(conn, 9, []byte{})
 }
 
 func main() {
