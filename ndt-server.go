@@ -47,7 +47,8 @@ func handleRequest(conn net.Conn) {
 	protocol.SendJSON(conn, 2, protocol.SimpleMsg{"v3.8.1"})
 
 	// TODO - this should be in response to the actual request.
-	protocol.SendJSON(conn, 2, protocol.SimpleMsg{"1 2 4 8 32"})
+	// protocol.SendJSON(conn, 2, protocol.SimpleMsg{"1 2 4 8 32"})
+	protocol.SendJSON(conn, 2, protocol.SimpleMsg{"1"})
 
 	tests.DoMiddleBox(conn)
 
