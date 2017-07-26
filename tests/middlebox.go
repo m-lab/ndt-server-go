@@ -34,15 +34,15 @@ func MiddleBox(conn net.Conn, lnr *net.TCPListener, testConn chan net.Conn) {
 
 	// Without this line, the Sleep above causes hangs at end
 	// of send loop.
-	mb.SetWriteBuffer(2 * 8192)
+	// mb.SetWriteBuffer(2 * 8192)
 	// TODO - set up MSS and CWND.
 	fmt.Println("Middlebox connected")
 
 	start := time.Now()
 	count := 0
-	for time.Now().Before(start.Add(5 * time.Second)) {
-		// Send some data.
-		mb.SetWriteDeadline(time.Now().Add(100 * time.Millisecond))
+	mb.SetWriteDeadline(time.Now().Add(5000 * time.Millisecond))
+	for {
+		// Continously send data.
 		_, err := mb.Write(data)
 		if err != nil {
 			fmt.Println(time.Now().Sub(start), " ", err)
@@ -76,7 +76,7 @@ func DoMiddleBox(conn net.Conn) {
 	fmt.Println("Middlebox done")
 	protocol.SendJSON(conn, 5, protocol.SimpleMsg{"Results"})
 	msg, err := protocol.ReadMessage(conn)
-	fmt.Println(msg)
+	fmt.Println(string(msg.Content))
 	protocol.Send(conn, 6, []byte{})
 	testConn.Close()
 }
