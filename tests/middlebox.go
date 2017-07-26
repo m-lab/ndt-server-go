@@ -6,12 +6,28 @@ import (
 	"fmt"
 	"net"
 	"os"
+	"syscall"
 	"time"
 
 	"github.com/m-lab/ndt-server-go/protocol"
 )
 
-// MiddleBox accepts connection, then writes as fast as possible,
+// SetMSS uses syscall to set the MSS value on a connection.
+func SetMSS(tcp *net.TCPListener, mss int) {
+	file, err := tcp.File()
+	if err != nil {
+		fmt.Println("error in getting file for the connection!")
+		os.Exit(1)
+	}
+	err = syscall.SetsockoptInt(int(file.Fd()), syscall.SOL_TCP, syscall.TCP_MAXSEG, mss)
+	file.Close()
+	if err != nil {
+		fmt.Println("error in setting MSS option on socket:", err)
+		os.Exit(1)
+	}
+}
+
+// DoMiddleBox listens, accepts connection, then writes as fast as possible,
 // for 5 seconds.
 // MSS should be 1456
 // After connection is accepted should:
@@ -21,40 +37,6 @@ import (
 //   4. Finalize
 //   5. Close port
 //   6. Notify waiter.
-func MiddleBox(conn net.Conn, lnr *net.TCPListener, testConn chan net.Conn) {
-	data := make([]byte, 8192)
-	rand.Read(data)
-
-	mb, err := lnr.AcceptTCP()
-	if err != nil {
-		fmt.Println("Error accepting: ", err.Error())
-		// TODO - should this be fatal?
-		os.Exit(1)
-	}
-
-	// Without this line, the Sleep above causes hangs at end
-	// of send loop.
-	// mb.SetWriteBuffer(2 * 8192)
-	// TODO - set up MSS and CWND.
-	fmt.Println("Middlebox connected")
-
-	start := time.Now()
-	count := 0
-	mb.SetWriteDeadline(time.Now().Add(5000 * time.Millisecond))
-	for {
-		// Continously send data.
-		_, err := mb.Write(data)
-		if err != nil {
-			fmt.Println(time.Now().Sub(start), " ", err)
-			break
-		}
-		count++
-	}
-	fmt.Println("Total of ", count, " 8KB blocks sent.")
-	// Send test connection back to be closed.
-	testConn <- mb
-}
-
 func DoMiddleBox(conn net.Conn) {
 	// Handle the MiddleBox test.
 	addr, _ := net.ResolveTCPAddr("tcp", "localhost:0")
@@ -67,16 +49,44 @@ func DoMiddleBox(conn net.Conn) {
 	defer lnr.Close()
 
 	_, port, err := net.SplitHostPort(lnr.Addr().String())
-	connChan := make(chan net.Conn)
-	go MiddleBox(conn, lnr, connChan)
 	// Send the TEST_PREPARE message.
-	protocol.SendJSON(conn, 3, protocol.SimpleMsg{port})
+	protocol.SendJSON(conn, 3, protocol.SimpleMsg{Msg: port})
 	fmt.Println("Waiting for test to complete.")
-	testConn := <-connChan
+	data := make([]byte, 1456)
+	rand.Read(data)
+
+	// TODO - set up MSS and CWND.
+	SetMSS(lnr, 1456)
+
+	mb, err := lnr.AcceptTCP()
+	if err != nil {
+		fmt.Println("Error accepting: ", err.Error())
+		// TODO - should this be fatal?
+		os.Exit(1)
+	}
+
+	mb.SetWriteBuffer(8192)
+	fmt.Println("Middlebox connected")
+
+	start := time.Now()
+	count := 0
+	// This deadline actually controls the send period.
+	mb.SetWriteDeadline(time.Now().Add(5000 * time.Millisecond))
+	for {
+		// Continously send data.
+		_, err := mb.Write(data)
+		if err != nil {
+			fmt.Println(time.Now().Sub(start), " ", err)
+			break
+		}
+		count++
+	}
+	fmt.Println("Total of ", count, " ", len(data), " byte blocks sent.")
+	// Send test connection back to be closed.
 	fmt.Println("Middlebox done")
-	protocol.SendJSON(conn, 5, protocol.SimpleMsg{"Results"})
+	protocol.SendJSON(conn, 5, protocol.SimpleMsg{Msg: "Results"})
 	msg, err := protocol.ReadMessage(conn)
 	fmt.Println(string(msg.Content))
 	protocol.Send(conn, 6, []byte{})
-	testConn.Close()
+	mb.Close()
 }
