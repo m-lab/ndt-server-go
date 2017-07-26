@@ -2,22 +2,30 @@ package protocol_test
 
 import (
 	"bytes"
+	"log"
 	"testing"
 
 	"github.com/m-lab/ndt-server-go/protocol"
 )
 
+func init() {
+	// Always prepend the filename and line number.
+	log.SetFlags(log.LstdFlags | log.Lshortfile)
+}
+
 func TestReadMessage(t *testing.T) {
+	// TODO - should verify reading multiple messages from one reader.
 	buf := bytes.NewBuffer(make([]byte, 0, 200))
 	m := "{\"msg\": \"4.0.0.1\", \"tests\": \"63\"}"
-	buf.Write([]byte{11, 0, byte(len(m))})
+	buf.Write([]byte{protocol.ProtocolExtended, 0, byte(len(m))})
 	buf.WriteString(m)
 
 	msg, err := protocol.ReadMessage(buf)
 	if err != nil {
 		t.Error(err.Error())
+		return
 	}
-	if len(msg.Content) != 33 {
+	if len(msg.Content) != len(m) {
 		t.Error("Wrong content length: ", len(msg.Content))
 	}
 
@@ -26,7 +34,7 @@ func TestReadMessage(t *testing.T) {
 func TestReadLogin11(t *testing.T) {
 	buf := bytes.NewBuffer(make([]byte, 0, 200))
 	msg := "{\"msg\": \"4.0.0.1\", \"tests\": \"63\"}"
-	buf.Write([]byte{11, 0, byte(len(msg))})
+	buf.Write([]byte{protocol.ProtocolExtended, 0, byte(len(msg))})
 	buf.WriteString(msg)
 
 	login, err := protocol.ReadLogin(buf)
