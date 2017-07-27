@@ -4,12 +4,19 @@ package main
 MSG_LOGIN uses binary protocol
 MSG_EXTENDED_LOGIN uses binary message types, but json message bodies.
 
-
+Testing:
+  websockets: 
+	from ndt node_tests directory...
+	   nodejs ndt_client.js --server localhost
+	   (may need to 'npm install ws' in local directory)
+  raw: 
+    from ndt base directory
+       src/web100clt -n localhost -dddddd -u `pwd` --enableprotolog
 */
 
 import (
 	"bufio"
-	"fmt"
+	"log"
 	"net"
 	"os"
 
@@ -21,6 +28,11 @@ const (
 	NDTPort = "3001"
 )
 
+func init() {
+	// Always prepend the filename and line number.
+	log.SetFlags(log.LstdFlags | log.Lshortfile)
+}
+
 func handleRequest(conn net.Conn) {
 	// Close the connection when you're done with it.
 	defer conn.Close()
@@ -29,11 +41,11 @@ func handleRequest(conn net.Conn) {
 	// Read the incoming login message.
 	login, err := protocol.ReadLogin(rdr)
 	if err != nil {
-		fmt.Println(err)
+		log.Println(err)
 		return
 	}
 
-	fmt.Println(login)
+	log.Println(login)
 	// Send "Kickoff" message
 	conn.Write([]byte("123456 654321"))
 	// Send next messages in the handshake.
@@ -54,19 +66,19 @@ func main() {
 	// TODO - does this listen on both ipv4 and ipv6?
 	l, err := net.Listen("tcp", "localhost:"+NDTPort)
 	if err != nil {
-		fmt.Println("Error listening:", err.Error())
+		log.Println("Error listening:", err.Error())
 		os.Exit(1)
 	}
 
 	// Close the listener when the application closes.
 	defer l.Close()
 
-	fmt.Println("Listening on port " + NDTPort)
+	log.Println("Listening on port " + NDTPort)
 	for {
 		// Listen for an incoming connection.
 		conn, err := l.Accept()
 		if err != nil {
-			fmt.Println("Error accepting: ", err.Error())
+			log.Println("Error accepting: ", err.Error())
 			// TODO - should this be fatal?
 			os.Exit(1)
 		}
