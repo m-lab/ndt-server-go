@@ -4,34 +4,32 @@ package tests
 import (
 	"crypto/rand"
 	"encoding/json"
+	"errors"
 	"log"
 	"net"
 	"os"
 	"syscall"
 	"time"
+	"unsafe"
 
 	"github.com/m-lab/ndt-server-go/protocol"
-	"github.com/mikioh/tcp"
-	"github.com/mikioh/tcpinfo"
 )
 
-// Getcwd
+// Alternate (better) way to get tcpinfo
+func TCPInfo2(conn *net.TCPConn) (syscall.TCPInfo, error) {
+	var info syscall.TCPInfo
+	file, err := conn.File()
+	if err != nil {
+		log.Println("error in getting file for the connection!")
+		return info, err
+	}
+	fd := file.Fd()
 
-// SetMSS uses syscall to set the MSS value on a connection.
-func TCPInfo(conn net.Conn) {
-	/*
-		file, err := conn.File()
-		if err != nil {
-			log.Println("error in getting file for the connection!")
-			os.Exit(1)
-		}
-		var info syscall.TCPInfo
-		err = syscall.GetsockoptInt(int(file.Fd()), syscall.IPPROTO_IP, syscall.TCP_INFO, &info)
-		file.Close()
-		if err != nil {
-			log.Println("error in setting MSS option on socket:", err)
-			os.Exit(1)
-		} */
+	infoLen := uint32(syscall.SizeofTCPInfo)
+	if _, _, e1 := syscall.Syscall6(syscall.SYS_GETSOCKOPT, fd, syscall.SOL_TCP, syscall.TCP_INFO, uintptr(unsafe.Pointer(&info)), uintptr(unsafe.Pointer(&infoLen)), 0); e1 != 0 {
+		return info, errors.New("Syscall error")
+	}
+	return info, nil
 }
 
 // SetMSS uses syscall to set the MSS value on a connection.
@@ -106,22 +104,9 @@ func DoMiddleBox(conn net.Conn) {
 	log.Println("Total of ", count, " ", len(data), " byte blocks sent.")
 	log.Println("Middlebox done")
 
-	var o tcpinfo.Info
-	var b [256]byte
-	tc, err := tcp.NewConn(mb)
-	if err != nil {
-		// error handling
-	}
-	i, err := tc.Option(o.Level(), o.Name(), b[:])
-	log.Printf("%v\n", i)
-	if err != nil {
-		// error handling
-	}
-	txt, err := json.Marshal(i)
-	if err != nil {
-		// error handling
-	}
-	log.Println(string(txt))
+	info, err := TCPInfo2(mb)
+	infoJSON, _ := json.Marshal(info)
+	log.Println(string(infoJSON))
 
 	protocol.SendJSON(conn, 5, protocol.SimpleMsg{Msg: "Results"})
 	msg, err := protocol.ReadMessage(conn)
