@@ -2,6 +2,7 @@ package protocol_test
 
 import (
 	"bytes"
+	"log"
 	"testing"
 
 	"github.com/m-lab/ndt-server-go/protocol"
@@ -16,7 +17,9 @@ func TestReadMessage(t *testing.T) {
 	msg, err := protocol.ReadMessage(buf)
 	if err != nil {
 		t.Error(err.Error())
+		return
 	}
+	log.Println(msg)
 	if len(msg.Content) != 33 {
 		t.Error("Wrong content length: ", len(msg.Content))
 	}
