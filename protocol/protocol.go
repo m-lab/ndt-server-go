@@ -14,6 +14,7 @@ import (
 	"encoding/binary"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"log"
 	"os"
@@ -70,14 +71,14 @@ func ReadMessage(rdr io.Reader) (Message, error) {
 	var hdr header
 	err = binary.Read(rdr, binary.BigEndian, &hdr)
 	if err != nil {
-		log.Println(err)
+		fmt.Println(err)
 		return Message{}, err
 	}
 	log.Println(hdr)
 	content := make([]byte, hdr.Length)
 	err = binary.Read(rdr, binary.BigEndian, content)
-	if err != nil {
-		log.Println(err)
+	if err != nil && err != io.EOF {
+		fmt.Println(err)
 		return Message{}, err
 	}
 	return Message{hdr, content}, nil
