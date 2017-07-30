@@ -8,6 +8,11 @@ import (
 	"github.com/m-lab/ndt-server-go/protocol"
 )
 
+func init() {
+	// Always prepend the filename and line number.
+	log.SetFlags(log.LstdFlags | log.Lshortfile)
+}
+
 func TestReadMessage(t *testing.T) {
 	buf := bytes.NewBuffer(make([]byte, 0, 200))
 	m := "{\"msg\": \"4.0.0.1\", \"tests\": \"63\"}"
@@ -19,7 +24,6 @@ func TestReadMessage(t *testing.T) {
 		t.Error(err.Error())
 		return
 	}
-	log.Println(msg)
 	if len(msg.Content) != 33 {
 		t.Error("Wrong content length: ", len(msg.Content))
 	}

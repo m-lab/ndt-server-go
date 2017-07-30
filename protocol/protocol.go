@@ -14,7 +14,6 @@ import (
 	"encoding/binary"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"io"
 	"log"
 	"os"
@@ -53,32 +52,36 @@ type Message struct {
 var IllegalMessage = errors.New("Illegal Message Header")
 
 func ReadMessage(rdr io.Reader) (Message, error) {
-	peeker := bufio.NewReader(rdr)
-	get, err := peeker.Peek(3)
+	brdr := bufio.NewReader(rdr)
+	get, err := brdr.Peek(3)
 	if err != nil {
 		log.Println(err)
 		return Message{}, err
 	}
 	if get[0] > 11 {
+		// TODO
+		// Probably best way to handle this is to create a new connection
+		// to the websockets handler, and proxy everything from this
+		// connection to the websockets connection.  A little less ugly
+		// than the alternatives.
 		for i := 0; i < 8; i++ {
-			line, _ := peeker.ReadString('\n')
+			line, _ := brdr.ReadString('\n')
 			log.Printf("%s", string(line))
 		}
 		return Message{}, IllegalMessage
-
 	}
 
 	var hdr header
-	err = binary.Read(rdr, binary.BigEndian, &hdr)
+	err = binary.Read(brdr, binary.BigEndian, &hdr)
 	if err != nil {
-		fmt.Println(err)
+		log.Println(err)
 		return Message{}, err
 	}
 	log.Println(hdr)
 	content := make([]byte, hdr.Length)
-	err = binary.Read(rdr, binary.BigEndian, content)
+	err = binary.Read(brdr, binary.BigEndian, content)
 	if err != nil && err != io.EOF {
-		fmt.Println(err)
+		log.Println(err)
 		return Message{}, err
 	}
 	return Message{hdr, content}, nil
