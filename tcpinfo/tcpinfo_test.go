@@ -6,45 +6,54 @@ import (
 	"net"
 	"os"
 	"sync"
+	"syscall"
 	"testing"
 
 	"github.com/m-lab/ndt-server-go/tcpinfo"
 )
 
-func listen(port *net.TCPAddr, wg *sync.WaitGroup, ch chan net.Conn) {
-	lnr, err := net.ListenTCP("tcp", port)
-	defer lnr.Close()
+func listen(ln net.Listener, wg *sync.WaitGroup, ch chan net.Conn) {
+	defer ln.Close()
 
-	tcp, err := lnr.Accept()
+	log.Println("Listening on ", ln.Addr())
+	tcp, err := ln.Accept()
 	if err != nil {
 		fmt.Println("Error accepting: ", err.Error())
 		os.Exit(1)
 	}
+	log.Println("Connected")
 
 	ch <- tcp
+	log.Println("Sent conn")
 	wg.Wait()
 }
 
-// Alternate (better) way to get tcpinfo
 func BenchmarkTCPInfo2(b *testing.B) {
 
-	serve, _ := net.ResolveTCPAddr("tcp", ":0")
-	log.Println(serve.String())
-	var wg sync.WaitGroup
-	var ch chan net.Conn
-	go listen(serve, &wg, ch)
+	// listen on all interfaces
+	ln, _ := net.Listen("tcp", ":0")
 
-	client, _ := net.ResolveTCPAddr("tcp", ":0")
-	dialer, err := net.DialTCP("tcp", client, serve)
+	var wg sync.WaitGroup
+	wg.Add(1)
+	ch := make(chan net.Conn)
+	go listen(ln, &wg, ch)
+
+	log.Println("Dialing")
+	dialer, err := net.Dial("tcp", ln.Addr().String())
+	defer dialer.Close()
 	if err != nil {
 		fmt.Println("Error dialing: ", err.Error())
 		os.Exit(1)
 	}
 
-	_ = <-ch
+	log.Println("Waiting")
+	tcp := <-ch
+	log.Println("Connected on ", tcp.RemoteAddr())
+	var info syscall.TCPInfo
 	for n := 0; n < b.N; n++ {
-		tcpinfo.TCPInfo2(dialer)
+		info, _ = tcpinfo.TCPInfo2(dialer.(*net.TCPConn))
 	}
 
 	wg.Done()
+	log.Printf("%+v\n", info)
 }
