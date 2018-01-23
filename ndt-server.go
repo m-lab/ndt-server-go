@@ -1,6 +1,7 @@
 package main
 
 import (
+	"github.com/m-lab/ndt-server-go/protocol"
 	"fmt"
 	"net"
 	"os"
@@ -12,6 +13,7 @@ const (
 	TYPE = "tcp"
 )
 
+/*
 func handleRequest(conn net.Conn) {
 	// Make a buffer to hold incoming data.
 	buf := make([]byte, 1024)
@@ -26,6 +28,7 @@ func handleRequest(conn net.Conn) {
 	// Close the connection when you're done with it.
 	conn.Close()
 }
+*/
 
 func main() {
 	l, err := net.Listen(TYPE, HOST+":"+PORT)
@@ -47,6 +50,6 @@ func main() {
 			os.Exit(1)
 		}
 		// Handle connections in a new goroutine.
-		go handleRequest(conn)
+		go protocol.HandleControlConnection(conn)
 	}
 }
