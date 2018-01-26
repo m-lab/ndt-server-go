@@ -10,7 +10,7 @@ import (
 
 // BytesGenerator is a random bytes generator. We use it to generate random
 // sequences of characters in the NDT test. BytesGenerator implements optimized
-// techniques described in https://stackoverflow.com/a/12321192. One issue of
+// techniques described in https://stackoverflow.com/a/31832326. One issue of
 // BytesGenerator is that it's not multi-goroutine safe. When serving a client
 // with multiple goroutines, create a BytesGenerator per goroutine!
 type BytesGenerator struct {
