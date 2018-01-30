@@ -34,8 +34,7 @@ func (dr DeadlineReader) IoReadFull(data []byte) (int, error) {
 	if err != nil {
 		return count, err
 	}
-	err = dr.conn.SetReadDeadline(time.Time{})
-	return count, err
+	return count, dr.conn.SetReadDeadline(time.Time{})
 }
 
 func (dr DeadlineReader) SetDeadline(deadline time.Duration) {
