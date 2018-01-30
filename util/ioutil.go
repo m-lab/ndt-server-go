@@ -24,7 +24,7 @@ func NewDeadlineReader(conn net.Conn) DeadlineReader {
 	}
 }
 
-func (dr DeadlineReader) IoReadFull(data []byte) (int, error) {
+func (dr DeadlineReader) ReadFull(data []byte) (int, error) {
 	count := 0
 	err := dr.conn.SetReadDeadline(time.Now().Add(dr.deadline))
 	if err != nil {
