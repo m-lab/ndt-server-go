@@ -30,7 +30,9 @@ func (dr DeadlineReader) ReadFull(data []byte) (int, error) {
 	if err != nil {
 		return count, err
 	}
-	count, err = io.ReadFull(dr.Reader, data)
+	// Note: passing in `dr` so that we can possibly later "override"
+	// other functions of `dr`
+	count, err = io.ReadFull(dr, data)
 	if err != nil {
 		return count, err
 	}
