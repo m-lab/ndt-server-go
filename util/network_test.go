@@ -57,11 +57,11 @@ func (mockedConn) SetWriteDeadline(t time.Time) error {
 func TestDeadlineConnSetTimeoutWorks(t *testing.T) {
 	dc := NewDeadlineConn(mockedConn{})
 	err := dc.SetTimeout(-1)
-	if err != InvalidTimeoutError {
+	if err != ErrInvalidTimeout {
 		t.Error("we should not be able to set a negative timeout")
 	}
 	err = dc.SetTimeout(0)
-	if err != InvalidTimeoutError {
+	if err != ErrInvalidTimeout {
 		t.Error("we should not be able to set a zero timeout")
 	}
 	err = dc.SetTimeout(1)
@@ -76,32 +76,32 @@ type failSetReadDeadline struct {
 	mockedConn
 }
 
-var setReadDeadlineError = errors.New("set_read_deadline_error")
+var errSetReadDeadline = errors.New("err_set_read_deadline")
 
 func (failSetReadDeadline) SetReadDeadline(t time.Time) error {
-	return setReadDeadlineError
+	return errSetReadDeadline
 }
 
 type failRead struct {
 	mockedConn
 }
 
-var readError = errors.New("read_error")
+var errRead = errors.New("err_read")
 
 func (failRead) Read(base []byte) (int, error) {
-	return 0, readError
+	return 0, errRead
 }
 
 type failClearReadDeadline struct {
 	mockedConn
 }
 
-var clearReadDeadlineError = errors.New("clear_read_deadline_error")
+var errClearReadDeadline = errors.New("err_clear_read_deadline")
 
 func (failClearReadDeadline) SetReadDeadline(t time.Time) error {
 	zero := time.Time{}
 	if t == zero {
-		return clearReadDeadlineError
+		return errClearReadDeadline
 	}
 	return nil
 }
@@ -111,7 +111,7 @@ func TestDeadlineConnReadWorks(t *testing.T) {
 		dc := NewDeadlineConn(failSetReadDeadline{})
 		data := make([]byte, 128)
 		count, err := dc.Read(data)
-		if count != 0 || err != setReadDeadlineError {
+		if count != 0 || err != errSetReadDeadline {
 			t.Error("unexpected return value")
 		}
 	}
@@ -120,7 +120,7 @@ func TestDeadlineConnReadWorks(t *testing.T) {
 		dc := NewDeadlineConn(failRead{})
 		data := make([]byte, 128)
 		count, err := dc.Read(data)
-		if count != 0 || err != readError {
+		if count != 0 || err != errRead {
 			t.Error("unexpected return value")
 		}
 	}
@@ -129,7 +129,7 @@ func TestDeadlineConnReadWorks(t *testing.T) {
 		dc := NewDeadlineConn(failClearReadDeadline{})
 		data := make([]byte, 128)
 		count, err := dc.Read(data)
-		if count != len(data) || err != clearReadDeadlineError {
+		if count != len(data) || err != errClearReadDeadline {
 			t.Error("unexpected return value")
 		}
 	}
@@ -150,32 +150,32 @@ type failSetWriteDeadline struct {
 	mockedConn
 }
 
-var setWriteDeadlineError = errors.New("set_write_deadline_error")
+var errSetWriteDeadline = errors.New("err_set_write_deadline")
 
 func (failSetWriteDeadline) SetWriteDeadline(t time.Time) error {
-	return setWriteDeadlineError
+	return errSetWriteDeadline
 }
 
 type failWrite struct {
 	mockedConn
 }
 
-var writeError = errors.New("write_error")
+var errWrite = errors.New("err_write")
 
 func (failWrite) Write(base []byte) (int, error) {
-	return 0, writeError
+	return 0, errWrite
 }
 
 type failClearWriteDeadline struct {
 	mockedConn
 }
 
-var clearWriteDeadlineError = errors.New("clear_write_deadline_error")
+var errClearWriteDeadline = errors.New("err_clear_write_deadline")
 
 func (failClearWriteDeadline) SetWriteDeadline(t time.Time) error {
 	zero := time.Time{}
 	if t == zero {
-		return clearWriteDeadlineError
+		return errClearWriteDeadline
 	}
 	return nil
 }
@@ -185,7 +185,7 @@ func TestDeadlineConnWriteWorks(t *testing.T) {
 		dc := NewDeadlineConn(failSetWriteDeadline{})
 		data := make([]byte, 128)
 		count, err := dc.Write(data)
-		if count != 0 || err != setWriteDeadlineError {
+		if count != 0 || err != errSetWriteDeadline {
 			t.Error("unexpected return value")
 		}
 	}
@@ -194,7 +194,7 @@ func TestDeadlineConnWriteWorks(t *testing.T) {
 		dc := NewDeadlineConn(failWrite{})
 		data := make([]byte, 128)
 		count, err := dc.Write(data)
-		if count != 0 || err != writeError {
+		if count != 0 || err != errWrite {
 			t.Error("unexpected return value")
 		}
 	}
@@ -203,7 +203,7 @@ func TestDeadlineConnWriteWorks(t *testing.T) {
 		dc := NewDeadlineConn(failClearWriteDeadline{})
 		data := make([]byte, 128)
 		count, err := dc.Write(data)
-		if count != len(data) || err != clearWriteDeadlineError {
+		if count != len(data) || err != errClearWriteDeadline {
 			t.Error("unexpected return value")
 		}
 	}

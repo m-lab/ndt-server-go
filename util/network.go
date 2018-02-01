@@ -22,19 +22,19 @@ const DefaultDeadlineConnTimeout = 10.0 * time.Second
 // NewDeadlineConn creates a new DeadlineConn.
 func NewDeadlineConn(conn net.Conn) DeadlineConn {
 	return DeadlineConn{
-		Conn: conn,
+		Conn:    conn,
 		timeout: DefaultDeadlineConnTimeout,
 	}
 }
 
-// InvalidTimeoutError is returned when you attempt to set an invalid timeout.
-var InvalidTimeoutError = errors.New("Timeout is invalid")
+// ErrInvalidTimeout is returned when you attempt to set an invalid timeout.
+var ErrInvalidTimeout = errors.New("Timeout is invalid")
 
 // SetTimeout sets the DeadlineConn timeout. Negative and zero timeouts cause
-// an InvalidTimeoutError to be retured by this function.
+// an ErrInvalidTimeout to be retured by this function.
 func (dc DeadlineConn) SetTimeout(timeout time.Duration) error {
 	if timeout <= 0 {
-		return InvalidTimeoutError
+		return ErrInvalidTimeout
 	}
 	dc.timeout = timeout
 	return nil
