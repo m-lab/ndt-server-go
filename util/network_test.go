@@ -10,10 +10,33 @@ import (
 	"time"
 )
 
-// mockedConn: mocks net.Conn
+// mockedConn & mockedAddr: mock net.Conn and net.Addr
 
+// mockedAddr implements the net.Addr interface as of golang v1.9.3. If new
+// functions are added to net.Addr in the future and are not mocked, attempting
+// to access them will most certainly cause a panic at runtime.
+type mockedAddr struct {
+	network string
+	repr    string
+}
+
+func (ma mockedAddr) Network() string {
+	return ma.network
+}
+
+func (ma mockedAddr) String() string {
+	return ma.repr
+}
+
+// mockedConn implements the net.Conn interface as of golang v1.9.3. If new
+// functions are added to net.Conn in the future and are not mocked, attempting
+// to access them will most certainly cause a panic at runtime.
 type mockedConn struct {
 	net.Conn
+}
+
+func newMockedConn() net.Conn {
+	return mockedConn{}
 }
 
 func (mockedConn) Read(b []byte) (int, error) {
@@ -29,11 +52,17 @@ func (mockedConn) Close() error {
 }
 
 func (mockedConn) LocalAddr() net.Addr {
-	return nil // note: for now not required
+	return mockedAddr{
+		network: "tcp",
+		repr:    "127.0.0.1:54321",
+	}
 }
 
 func (mockedConn) RemoteAddr() net.Addr {
-	return nil // note: for now not required
+	return mockedAddr{
+		network: "tcp",
+		repr:    "127.0.0.1:8080",
+	}
 }
 
 func (c mockedConn) SetDeadline(t time.Time) error {
@@ -50,6 +79,72 @@ func (mockedConn) SetReadDeadline(t time.Time) error {
 
 func (mockedConn) SetWriteDeadline(t time.Time) error {
 	return nil
+}
+
+// TestMockedConnIsUsable ensures that mockedConn implements net.Conn (and
+// net.Addr) given the current state of these interfaces as of go v1.9.3.
+func TestMockedConnIsUsable(t *testing.T) {
+	mc := newMockedConn() // make sure we use it through the interface
+
+	{
+		data := make([]byte, 128)
+		count, err := mc.Read(data)
+		if count != len(data) || err != nil {
+			t.Error("mockedConn cannot Read()")
+		}
+	}
+
+	{
+		data := make([]byte, 128)
+		count, err := mc.Write(data)
+		if count != len(data) || err != nil {
+			t.Error("mockedConn cannot Write()")
+		}
+	}
+
+	{
+		err := mc.Close()
+		if err != nil {
+			t.Error("mockedConn cannot Close()")
+		}
+	}
+
+	{
+		local := mc.LocalAddr()
+		// the reason why I'm calling Network() and String is to proof that
+		// they are not going to panic, I don't care about values
+		if local == nil || local.Network() == "" || local.String() == "" {
+			t.Error("mxockedConn cannot LocalAddr()")
+		}
+	}
+
+	{
+		remote := mc.RemoteAddr()
+		if remote == nil || remote.Network() == "" || remote.String() == "" {
+			t.Error("mxockedConn cannot RemoteAddr()")
+		}
+	}
+
+	{
+		err := mc.SetDeadline(time.Time{})
+		if err != nil {
+			t.Error("mockedConn cannot SetDeadline()")
+		}
+	}
+
+	{
+		err := mc.SetReadDeadline(time.Time{})
+		if err != nil {
+			t.Error("mockedConn cannot SetReadDeadline()")
+		}
+	}
+
+	{
+		err := mc.SetWriteDeadline(time.Time{})
+		if err != nil {
+			t.Error("mockedConn cannot SetWriteDeadline()")
+		}
+	}
 }
 
 // Test: setTimeout
