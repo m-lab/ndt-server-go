@@ -92,20 +92,6 @@ func (failRead) Read(base []byte) (int, error) {
 	return 0, errRead
 }
 
-type failClearReadDeadline struct {
-	mockedConn
-}
-
-var errClearReadDeadline = errors.New("err_clear_read_deadline")
-
-func (failClearReadDeadline) SetReadDeadline(t time.Time) error {
-	zero := time.Time{}
-	if t == zero {
-		return errClearReadDeadline
-	}
-	return nil
-}
-
 func TestDeadlineConnReadWorks(t *testing.T) {
 	{
 		dc := NewDeadlineConn(failSetReadDeadline{})
@@ -121,15 +107,6 @@ func TestDeadlineConnReadWorks(t *testing.T) {
 		data := make([]byte, 128)
 		count, err := dc.Read(data)
 		if count != 0 || err != errRead {
-			t.Error("unexpected return value")
-		}
-	}
-
-	{
-		dc := NewDeadlineConn(failClearReadDeadline{})
-		data := make([]byte, 128)
-		count, err := dc.Read(data)
-		if count != len(data) || err != errClearReadDeadline {
 			t.Error("unexpected return value")
 		}
 	}
@@ -166,20 +143,6 @@ func (failWrite) Write(base []byte) (int, error) {
 	return 0, errWrite
 }
 
-type failClearWriteDeadline struct {
-	mockedConn
-}
-
-var errClearWriteDeadline = errors.New("err_clear_write_deadline")
-
-func (failClearWriteDeadline) SetWriteDeadline(t time.Time) error {
-	zero := time.Time{}
-	if t == zero {
-		return errClearWriteDeadline
-	}
-	return nil
-}
-
 func TestDeadlineConnWriteWorks(t *testing.T) {
 	{
 		dc := NewDeadlineConn(failSetWriteDeadline{})
@@ -195,15 +158,6 @@ func TestDeadlineConnWriteWorks(t *testing.T) {
 		data := make([]byte, 128)
 		count, err := dc.Write(data)
 		if count != 0 || err != errWrite {
-			t.Error("unexpected return value")
-		}
-	}
-
-	{
-		dc := NewDeadlineConn(failClearWriteDeadline{})
-		data := make([]byte, 128)
-		count, err := dc.Write(data)
-		if count != len(data) || err != errClearWriteDeadline {
 			t.Error("unexpected return value")
 		}
 	}

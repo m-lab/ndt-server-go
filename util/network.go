@@ -47,11 +47,9 @@ func (dc DeadlineConn) Read(data []byte) (int, error) {
 	if err != nil {
 		return count, err
 	}
-	count, err = dc.Conn.Read(data)
-	if err != nil {
-		return count, err
-	}
-	return count, dc.Conn.SetReadDeadline(time.Time{})
+	// don't bother with resetting the deadline since it will be set
+	// again next time we call Read()
+	return dc.Conn.Read(data)
 }
 
 // Write implements net.Conn.Write with a specific timeout.
@@ -61,9 +59,7 @@ func (dc DeadlineConn) Write(data []byte) (int, error) {
 	if err != nil {
 		return count, err
 	}
-	count, err = dc.Conn.Write(data)
-	if err != nil {
-		return count, err
-	}
-	return count, dc.Conn.SetWriteDeadline(time.Time{})
+	// don't bother with resetting the deadline since it will be set
+	// again next time we call Write()
+	return dc.Conn.Write(data)
 }
