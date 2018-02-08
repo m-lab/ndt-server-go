@@ -10,7 +10,7 @@ import (
 )
 
 // DeadlineConn is a net.Conn where I/O operations have deadlines. They will
-// fail with an error if it takes more than a specific timeout to complete them.
+// fail with an error if it takes more than a specific time to complete them.
 type DeadlineConn struct {
 	net.Conn
 	timeout time.Duration
