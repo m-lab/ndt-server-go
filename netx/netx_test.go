@@ -32,7 +32,6 @@ func (ma mockedAddr) String() string {
 // functions are added to net.Conn in the future and are not mocked, attempting
 // to access them will most certainly cause a panic at runtime.
 type mockedConn struct {
-	net.Conn
 }
 
 func newMockedConn() net.Conn {
