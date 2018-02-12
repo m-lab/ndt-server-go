@@ -8,9 +8,9 @@ import (
 	"time"
 )
 
-// TestApiWorks makes sure that we correctly deal with all the possible
+// TestRandomApiWorks makes sure that we correctly deal with all the possible
 // range of input parameters and produce consistent output.
-func TestApiWorks(t *testing.T) {
+func TestRandomApiWorks(t *testing.T) {
 	check := func(f func(BytesGenerator, int) []byte) {
 		bgen := NewBytesGenerator()
 		o := f(bgen, -128)
@@ -34,12 +34,12 @@ func TestApiWorks(t *testing.T) {
 	})
 }
 
-// TestIsSeeded makes sure that two subsequently created generators
+// TestRandomIsSeeded makes sure that two subsequently created generators
 // do not typically generate equal random sequences. There may possibly
 // some cases in which this could fail (i.e. the clock jumping back
 // because of some cloud hiccups). I added a sleep in here to reduce
 // the likelyhood of that, but stil it may fail sometimes.
-func TestIsSeeded(t *testing.T) {
+func TestRandomIsSeeded(t *testing.T) {
 	check := func(f func(BytesGenerator, int) []byte) {
 		first := NewBytesGenerator()
 		time.Sleep(100 * time.Millisecond) // Be sure
