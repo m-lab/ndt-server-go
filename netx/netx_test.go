@@ -1,7 +1,7 @@
 // Part of ndt-server-go <https://github.com/m-lab/ndt-server-go>, which
 // is free software under the Apache v2.0 License.
 
-package util
+package netx
 
 import (
 	"errors"

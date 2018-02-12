@@ -1,7 +1,8 @@
 // Part of ndt-server-go <https://github.com/m-lab/ndt-server-go>, which
 // is free software under the Apache v2.0 License.
 
-package util
+// Package netx contains network extensions.
+package netx
 
 import (
 	"errors"
