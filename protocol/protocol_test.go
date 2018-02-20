@@ -1,7 +1,12 @@
+// Part of ndt-server-go <https://github.com/m-lab/ndt-server-go>, which
+// is free software under the Apache v2.0 License.
+
 package protocol_test
 
 import (
+	"bufio"
 	"bytes"
+	"encoding/binary"
 	"log"
 	"testing"
 
@@ -19,7 +24,7 @@ func TestReadMessage(t *testing.T) {
 	buf.Write([]byte{11, 0, byte(len(m))})
 	buf.WriteString(m)
 
-	msg, err := protocol.ReadMessage(buf)
+	msg, err := protocol.ReadMessage(bufio.NewReader(buf))
 	if err != nil {
 		t.Error(err.Error())
 		return
@@ -27,7 +32,6 @@ func TestReadMessage(t *testing.T) {
 	if len(msg.Content) != 33 {
 		t.Error("Wrong content length: ", len(msg.Content))
 	}
-
 }
 
 func TestReadLogin11(t *testing.T) {
@@ -36,7 +40,7 @@ func TestReadLogin11(t *testing.T) {
 	buf.Write([]byte{11, 0, byte(len(msg))})
 	buf.WriteString(msg)
 
-	login, err := protocol.ReadLogin(buf)
+	login, err := protocol.ReadLogin(bufio.NewReader(buf))
 	if err != nil {
 		t.Error(err.Error())
 	}
@@ -49,5 +53,32 @@ func TestReadLogin11(t *testing.T) {
 	if login.Tests != 63 {
 		t.Error("Tests should be 63: ", login.Tests)
 	}
+}
 
+func TestWriteMessage(t *testing.T) {
+	outputBuf := bytes.NewBuffer(make([]byte, 0, 200))
+	biow := bufio.NewWriter(outputBuf)
+	err := protocol.Send(biow, 4, []byte("abcdef"))
+	if err != nil {
+		t.Error(err.Error())
+	}
+	msgType, err := outputBuf.ReadByte()
+	if err != nil {
+		t.Error(err.Error())
+	}
+	if msgType != 4 {
+		t.Error("unexpected message type: ", msgType)
+	}
+	var length int16 = 0
+	err = binary.Read(outputBuf, binary.BigEndian, &length)
+	if err != nil {
+		t.Error(err.Error())
+	}
+	if length != 6 {
+		t.Error("unexpected message length: ", length)
+	}
+	body := outputBuf.String()
+	if body != "abcdef" {
+		t.Error("unexpected message body: ", body)
+	}
 }
