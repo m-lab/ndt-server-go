@@ -5,11 +5,11 @@ MSG_LOGIN uses binary protocol
 MSG_EXTENDED_LOGIN uses binary message types, but json message bodies.
 
 Testing:
-  websockets: 
+  websockets:
 	from ndt node_tests directory...
 	   nodejs ndt_client.js --server localhost
 	   (may need to 'npm install ws' in local directory)
-  raw: 
+  raw:
     from ndt base directory
        src/web100clt -n localhost -dddddd -u `pwd` --enableprotolog
 */
@@ -25,12 +25,7 @@ import (
 )
 
 const (
-	// HOST is the host to listen on
-	HOST = "localhost"
-	// PORT is the port to listen on
-	PORT = "3001"
-	// TYPE is the protocol to listen on
-	TYPE    = "tcp"
+	// NDTPort is the primary non-websocket port.
 	NDTPort = "3001"
 )
 
@@ -55,21 +50,21 @@ func handleRequest(conn net.Conn) {
 	// Send "Kickoff" message
 	conn.Write([]byte("123456 654321"))
 	// Send next messages in the handshake.
-	protocol.SendJSON(conn, 1, protocol.SimpleMsg{"0"})
-	protocol.SendJSON(conn, 2, protocol.SimpleMsg{"v3.8.1"})
+	protocol.SendJSON(conn, 1, protocol.SimpleMsg{Msg: "0"})
+	protocol.SendJSON(conn, 2, protocol.SimpleMsg{Msg: "v3.8.1"})
 
 	// TODO - this should be in response to the actual request.
 	// protocol.SendJSON(conn, 2, protocol.SimpleMsg{"1 2 4 8 32"})
-	protocol.SendJSON(conn, 2, protocol.SimpleMsg{"1"})
+	protocol.SendJSON(conn, 2, protocol.SimpleMsg{Msg: "1"})
 
 	tests.DoMiddleBox(conn)
-	protocol.SendJSON(conn, 8, protocol.SimpleMsg{"Results 1"})
-	protocol.SendJSON(conn, 8, protocol.SimpleMsg{"...Results 2"})
+	protocol.SendJSON(conn, 8, protocol.SimpleMsg{Msg: "Results 1"})
+	protocol.SendJSON(conn, 8, protocol.SimpleMsg{Msg: "...Results 2"})
 	protocol.Send(conn, 9, []byte{})
 }
 
 func main() {
-	// TODO - does this listen on both ipv4 and ipv6?
+	// TODO - handle ipv6 - this listens only on ipv4
 	l, err := net.Listen("tcp", "localhost:"+NDTPort)
 	if err != nil {
 		log.Println("Error listening:", err.Error())

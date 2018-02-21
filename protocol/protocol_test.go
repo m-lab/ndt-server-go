@@ -14,9 +14,10 @@ func init() {
 }
 
 func TestReadMessage(t *testing.T) {
+	// TODO - should verify reading multiple messages from one reader.
 	buf := bytes.NewBuffer(make([]byte, 0, 200))
 	m := "{\"msg\": \"4.0.0.1\", \"tests\": \"63\"}"
-	buf.Write([]byte{11, 0, byte(len(m))})
+	buf.Write([]byte{protocol.ProtocolExtended, 0, byte(len(m))})
 	buf.WriteString(m)
 
 	msg, err := protocol.ReadMessage(buf)
@@ -24,7 +25,7 @@ func TestReadMessage(t *testing.T) {
 		t.Error(err.Error())
 		return
 	}
-	if len(msg.Content) != 33 {
+	if len(msg.Content) != len(m) {
 		t.Error("Wrong content length: ", len(msg.Content))
 	}
 
@@ -33,7 +34,7 @@ func TestReadMessage(t *testing.T) {
 func TestReadLogin11(t *testing.T) {
 	buf := bytes.NewBuffer(make([]byte, 0, 200))
 	msg := "{\"msg\": \"4.0.0.1\", \"tests\": \"63\"}"
-	buf.Write([]byte{11, 0, byte(len(msg))})
+	buf.Write([]byte{protocol.ProtocolExtended, 0, byte(len(msg))})
 	buf.WriteString(msg)
 
 	login, err := protocol.ReadLogin(buf)

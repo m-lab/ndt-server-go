@@ -9,7 +9,7 @@ import (
 	"unsafe"
 )
 
-// Alternate (better) way to get tcpinfo
+// TCPInfo2 implements better way to get tcpinfo
 func TCPInfo2(conn *net.TCPConn) (syscall.TCPInfo, error) {
 	var info syscall.TCPInfo
 	file, err := conn.File()

@@ -23,8 +23,8 @@ import (
 // TestCode is used to decode the tests bitvector.
 type TestCode int
 
+// These are the bit codes for the individual NDT tests.
 const (
-	// TestMid and other enums indicate the individual tests.
 	TestMid TestCode = 1 << iota
 	TestC2S
 	TestS2C
@@ -33,6 +33,7 @@ const (
 	TestMeta
 )
 
+// header is local, but fields must be exported for json Unmarshal
 type header struct {
 	MsgType byte // The message type
 	Length  int16
@@ -46,19 +47,28 @@ type Message struct {
 	Content []byte
 }
 
-// IllegalMessage is returned when a message header does
+// ErrIllegalMessage is returned when a message header does
 // not conform to the binary protocol, e.g. when WebSockets
 // is used.
-var IllegalMessage = errors.New("Illegal Message Header")
+var ErrIllegalMessage = errors.New("illegal message header")
 
+// ReadMessage reads a single message from rdr, and determines which
+// protocol it required.
+// TODO - use more robust reader from botticelli ??
+// TODO - postpone multi-protocol handling to later versions of the code.
 func ReadMessage(rdr io.Reader) (Message, error) {
+	// TODO - any extra data from rdr may be lost!
 	brdr := bufio.NewReader(rdr)
-	get, err := brdr.Peek(3)
+	peek, err := brdr.Peek(3)
 	if err != nil {
 		log.Println(err)
 		return Message{}, err
 	}
-	if get[0] > 11 {
+	// Binary protocol will have 2 or 11 in the first byte.  Otherwise
+	// this is a websocket request.  Legacy server would accept both
+	// connection types on 3001, but this implementation does not, at
+	// least for now.
+	if peek[0] > ProtocolExtended {
 		// TODO
 		// Probably best way to handle this is to create a new connection
 		// to the websockets handler, and proxy everything from this
@@ -68,7 +78,7 @@ func ReadMessage(rdr io.Reader) (Message, error) {
 			line, _ := brdr.ReadString('\n')
 			log.Printf("%s", string(line))
 		}
-		return Message{}, IllegalMessage
+		return Message{}, ErrIllegalMessage
 	}
 
 	var hdr header
@@ -87,6 +97,8 @@ func ReadMessage(rdr io.Reader) (Message, error) {
 	return Message{hdr, content}, nil
 }
 
+// struct is local, but fields must be exported
+// for json Unmarshal.
 type loginJSON struct {
 	Msg   string
 	Tests string
@@ -99,6 +111,15 @@ type Login struct {
 	IsExtended bool   // Type 11
 }
 
+// ErrUnknownProtocol is returned when protocol is not recognized.
+var ErrUnknownProtocol = errors.New("unknown protocol")
+
+// Codes used by NDT to indicate legacy or extended protocol
+const (
+	ProtocolLegacy   = 2
+	ProtocolExtended = 11
+)
+
 // ReadLogin reads the initial login message.
 func ReadLogin(rdr io.Reader) (Login, error) {
 	msg, err := ReadMessage(rdr)
@@ -108,13 +129,13 @@ func ReadLogin(rdr io.Reader) (Login, error) {
 
 	log.Println(msg.Header)
 	switch msg.Header.MsgType {
-	case byte(2):
+	case byte(ProtocolLegacy):
 		// TODO Handle legacy, without json
 		panic("Not implemented")
 
-	case byte(11):
+	case byte(ProtocolExtended):
 		// Handle extended, with json
-		lj := loginJSON{"foo", "bar"}
+		lj := loginJSON{}
 		err := json.Unmarshal(msg.Content, &lj)
 		if err != nil {
 			log.Println("Error: ", err)
@@ -125,13 +146,14 @@ func ReadLogin(rdr io.Reader) (Login, error) {
 		}
 		return Login{byte(tests), lj.Msg, true}, nil
 	default:
+		// TODO maybe use ErrIllegalMessage
+		return Login{}, ErrUnknownProtocol
 	}
-	return Login{}, errors.New("Error")
 }
 
 // SimpleMsg helps encoding json messages.
 type SimpleMsg struct {
-	Msg string `json:"msg, string"`
+	Msg string `json:"msg,string"`
 }
 
 // Send sends a raw message to the client.
