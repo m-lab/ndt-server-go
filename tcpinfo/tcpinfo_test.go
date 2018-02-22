@@ -57,11 +57,11 @@ func TestBasic(t *testing.T) {
 	go listen(ln, &wg)
 
 	dialer, err := net.Dial("tcp", ln.Addr().String())
-	defer dialer.Close()
 	if err != nil {
 		fmt.Println("Error dialing: ", err.Error())
 		os.Exit(1)
 	}
+	defer dialer.Close()
 
 	var info syscall.TCPInfo
 	info, _ = tcpinfo.TCPInfo2(dialer.(*net.TCPConn))
