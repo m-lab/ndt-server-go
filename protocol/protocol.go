@@ -145,34 +145,34 @@ type SimpleMsg struct {
 }
 
 // Send sends a raw message to the client.
-func Send(conn *bufio.Writer, t byte, msg []byte) error {
+func Send(wr *bufio.Writer, t byte, msg []byte) error {
 	// Implementation note: here we could also use a net.Conn and a
 	// buffer backed by a char slice. However, since we're coding the
 	// protocol reader to be a *bufio.Reader, it would probably be
 	// more handy to create initially a *bufio.ReadWriter and, then,
 	// use that structure everywhere than having to pass around a
 	// *bufio.Reader and a net.Conn.
-	err := binary.Write(conn, binary.BigEndian, t)
+	err := binary.Write(wr, binary.BigEndian, t)
 	if err != nil {
 		return err
 	}
-	err = binary.Write(conn, binary.BigEndian, int16(len(msg)))
+	err = binary.Write(wr, binary.BigEndian, int16(len(msg)))
 	if err != nil {
 		return err
 	}
-	err = binary.Write(conn, binary.BigEndian, msg)
+	err = binary.Write(wr, binary.BigEndian, msg)
 	if err != nil {
 		return err
 	}
-	return conn.Flush()
+	return wr.Flush()
 }
 
 // SendJSON sends a json encoded message to the client.
-func SendJSON(conn *bufio.Writer, t byte, msg interface{}) error {
+func SendJSON(wr *bufio.Writer, t byte, msg interface{}) error {
 	j, err := json.Marshal(msg)
 	if err != nil {
 		log.Println(err)
 		return err
 	}
-	return Send(conn, t, j)
+	return Send(wr, t, j)
 }
