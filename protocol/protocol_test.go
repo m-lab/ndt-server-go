@@ -34,6 +34,37 @@ func TestReadMessage(t *testing.T) {
 	}
 }
 
+func TestReadMany(t *testing.T) {
+	buf := bytes.NewBuffer(make([]byte, 0, 200))
+	m := "{\"msg\": \"4.0.0.1\", \"tests\": \"63\"}"
+	buf.Write([]byte{11, 0, byte(len(m))})
+	buf.WriteString(m)
+
+	m = "{\"msg\": \"4.0.0\", \"tests\": \"6\"}"
+	buf.Write([]byte{11, 0, byte(len(m))})
+	buf.WriteString(m)
+
+	reader := bufio.NewReader(buf)
+
+	msg, err := protocol.ReadMessage(reader)
+	if err != nil {
+		t.Error(err.Error())
+		return
+	}
+	if len(msg.Content) != 33 {
+		t.Error("Wrong content length: ", len(msg.Content))
+	}
+
+	msg, err = protocol.ReadMessage(reader)
+	if err != nil {
+		t.Error(err.Error())
+		return
+	}
+	if len(msg.Content) != 30 {
+		t.Error("Wrong content length: ", len(msg.Content))
+	}
+}
+
 func TestReadLogin11(t *testing.T) {
 	buf := bytes.NewBuffer(make([]byte, 0, 200))
 	msg := "{\"msg\": \"4.0.0.1\", \"tests\": \"63\"}"
