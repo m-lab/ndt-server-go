@@ -10,6 +10,12 @@ import (
 	"strconv"
 )
 
+// TODO(gfr): decide where we want to put these files. We probably already
+// have some hint from already existing pull requests (e.g. "start").
+
+// TODO(bassosimone): refactor the code in here to use the message recv and
+// send layer that was recently merged into master as #21.
+
 /*
  __  __
 |  \/  | ___  ___ ___  __ _  __ _  ___  ___
