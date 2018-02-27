@@ -80,7 +80,8 @@ func RunS2cTest(cc net.Conn, reader *bufio.Reader, writer *bufio.Writer,
 
 	channel := make(chan int64)
 
-	output_buff := util.RandAsciiRemainder(8192)
+	gen := util.NewBytesGenerator()
+	output_buff := gen.GenLettersFast(8192)
 	start := time.Now()
 
 	for idx := 0; idx < len(conns); idx += 1 {
