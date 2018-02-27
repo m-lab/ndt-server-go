@@ -2,13 +2,11 @@ package protocol
 
 import (
 	"bufio"
-	"github.com/m-lab/ndt-server-go/util"
 	"encoding/binary"
 	"encoding/json"
 	"errors"
 	"io"
 	"log"
-	"net"
 	"strconv"
 )
 
@@ -23,13 +21,12 @@ import (
 	Message serialization and deserialization.
 */
 
-func read_message_internal(cc net.Conn, reader io.Reader) (
-                           byte, []byte, error) {
+func read_message_internal(rdwr *bufio.ReadWriter) (byte, []byte, error) {
 
 	// 1. read type
 
 	type_buff := make([]byte, 1)
-	_, err := util.IoReadFull(cc, reader, type_buff)
+	_, err := io.ReadFull(rdwr.Reader, type_buff)
 	if err != nil {
 		return 0, nil, err
 	}
@@ -39,7 +36,7 @@ func read_message_internal(cc net.Conn, reader io.Reader) (
 	// 2. read length
 
 	len_buff := make([]byte, 2)
-	_, err = util.IoReadFull(cc, reader, len_buff)
+	_, err = io.ReadFull(rdwr.Reader, len_buff)
 	if err != nil {
 		return 0, nil, err
 	}
@@ -49,7 +46,7 @@ func read_message_internal(cc net.Conn, reader io.Reader) (
 	// 3. read body
 
 	msg_body := make([]byte, msg_length)
-	_, err = util.IoReadFull(cc, reader, msg_body)
+	_, err = io.ReadFull(rdwr.Reader, msg_body)
 	if err != nil {
 		return 0, nil, err
 	}
@@ -62,12 +59,10 @@ type json_message_t struct {
 	Msg string `json:"msg"`
 }
 
-// ReadJsonMessage reads a JSON encoded NDT message from |reader|. You need
-// also to supply |cc| because we need to set the read deadline to make sure
-// we do not hang forever. Returns a triple: message type, message body
-// decoded from JSON, error that occurred.
-func ReadJsonMessage(cc net.Conn, reader io.Reader) (byte, string, error) {
-	msg_type, msg_buff, err := read_message_internal(cc, reader)
+// ReadJsonMessage reads a JSON encoded NDT message from |rdwr|. Returns a
+// triple: message type, message body decoded from JSON, error that occurred.
+func ReadJsonMessage(rdwr *bufio.ReadWriter) (byte, string, error) {
+	msg_type, msg_buff, err := read_message_internal(rdwr)
 	if err != nil {
 		return 0, "", err
 	}
@@ -82,7 +77,7 @@ func ReadJsonMessage(cc net.Conn, reader io.Reader) (byte, string, error) {
 	return msg_type, s_msg.Msg, nil
 }
 
-func write_message_internal(cc net.Conn, writer *bufio.Writer,
+func write_message_internal(rdwr *bufio.ReadWriter,
                             message_type byte, encoded_body []byte) error {
 
 	log.Printf("ndt: write any message: type=%d\n", message_type)
@@ -91,7 +86,7 @@ func write_message_internal(cc net.Conn, writer *bufio.Writer,
 
 	// 1. write type
 
-	err := util.IoWriteByte(cc, writer, message_type)
+	err := rdwr.Writer.WriteByte(message_type)
 	if err != nil {
 		return err
 	}
@@ -103,24 +98,23 @@ func write_message_internal(cc net.Conn, writer *bufio.Writer,
 	}
 	encoded_len := make([]byte, 2)
 	binary.BigEndian.PutUint16(encoded_len, uint16(len(encoded_body)))
-	_, err = util.IoWrite(cc, writer, encoded_len)
+	_, err = rdwr.Writer.Write(encoded_len)
 	if err != nil {
 		return err
 	}
 
 	// 3. write message body
 
-	_, err = util.IoWrite(cc, writer, encoded_body)
+	_, err = rdwr.Writer.Write(encoded_body)
 	if err != nil {
 		return err
 	}
-	return util.IoFlush(cc, writer)
+	return rdwr.Writer.Flush()
 }
 
-// WriteJsonMessage encodes as JSON and writes on |writer| the NDT message
-// with type |message_type| and body |message_body|. You need also to supply
-// |cc| because we need to set the write deadline on it. Returns the error.
-func WriteJsonMessage(cc net.Conn, writer *bufio.Writer,
+// WriteJsonMessage encodes as JSON and writes on |rdwr| the NDT message
+// with type |message_type| and body |message_body|.
+func WriteJsonMessage(rdwr *bufio.ReadWriter,
                       message_type byte, message_body string) error {
 
 	s_msg := &json_message_t{
@@ -132,7 +126,7 @@ func WriteJsonMessage(cc net.Conn, writer *bufio.Writer,
 	if err != nil {
 		return err
 	}
-	return write_message_internal(cc, writer, message_type, data)
+	return write_message_internal(rdwr, message_type, data)
 }
 
 // ExtendedLoginMessage contains the extended-login-message data.
@@ -145,12 +139,12 @@ type ExtendedLoginMessage struct {
 // ReadExtendedLogin reads the extended loging message from |reader|. You also
 // need to supply |cc| because we need to set the read deadline on it. This
 // function returns a tuple: the extended-loging-message pointer and the error.
-func ReadExtendedLogin(cc net.Conn, reader io.Reader) (
+func ReadExtendedLogin(rdwr *bufio.ReadWriter) (
                        *ExtendedLoginMessage, error) {
 
 	// Read ordinary message
 
-	msg_type, msg_buff, err := read_message_internal(cc, reader)
+	msg_type, msg_buff, err := read_message_internal(rdwr)
 	if err != nil {
 		return nil, err
 	}
@@ -182,13 +176,12 @@ func ReadExtendedLogin(cc net.Conn, reader io.Reader) (
 	return el_msg, nil
 }
 
-// WriteRaWstring writes |str| on |writer|. You need also to pass |cc| because
-// we need to set the write deadline. Returns the error.
-func WriteRawString(cc net.Conn, writer *bufio.Writer, str string) error {
+// WriteRaWstring writes |str| on |rdwr|.
+func WriteRawString(rdwr *bufio.ReadWriter, str string) error {
 	log.Printf("ndt: write raw string: '%s'", str)
-	_, err := util.IoWriteString(cc, writer, str)
+	_, err := rdwr.Writer.WriteString(str)
 	if err != nil {
 		return err
 	}
-	return util.IoFlush(cc, writer)
+	return rdwr.Writer.Flush()
 }

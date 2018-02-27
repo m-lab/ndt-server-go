@@ -3,6 +3,7 @@ package protocol
 import (
 	"bufio"
 	"errors"
+	"github.com/m-lab/ndt-server-go/netx"
 	"net"
 	"log"
 	"strconv"
@@ -14,19 +15,16 @@ import (
 	The control protocol.
 */
 
-func update_queue_pos(cc net.Conn, reader *bufio.Reader, writer *bufio.Writer,
-                      position int) error {
-	err := WriteJsonMessage(cc, writer, KvSrvQueue,
-			strconv.Itoa(position))
+func update_queue_pos(rdwr *bufio.ReadWriter, position int) error {
+	err := WriteJsonMessage(rdwr, KvSrvQueue, strconv.Itoa(position))
 	if err != nil {
 		return errors.New("ndt: cannot write SRV_QUEUE message")
 	}
-	err = WriteJsonMessage(cc, writer, KvSrvQueue,
-			KvSrvQueueHeartbeat)
+	err = WriteJsonMessage(rdwr, KvSrvQueue, KvSrvQueueHeartbeat)
 	if err != nil {
 		return errors.New("ndt: cannot write SRV_QUEUE heartbeat message")
 	}
-	msg_type, _, err := ReadJsonMessage(cc, reader)
+	msg_type, _, err := ReadJsonMessage(rdwr)
 	if err != nil {
 		return errors.New("ndt: cannot read MSG_WAITING message")
 	}
@@ -43,14 +41,14 @@ var KvProduct string = "ndt-server-go" // XXX move / change
 
 // HandleControlConnection handles the control connection |cc|.
 func HandleControlConnection(cc net.Conn) {
+	cc = netx.NewDeadlineConn(cc)
 	defer cc.Close()
 
-	reader := bufio.NewReader(cc)
-	writer := bufio.NewWriter(cc)
+	rdwr := bufio.NewReadWriter(bufio.NewReader(cc), bufio.NewWriter(cc))
 
 	// Read extended login message
 
-	login_msg, err := ReadExtendedLogin(cc, reader)
+	login_msg, err := ReadExtendedLogin(rdwr)
 	if err != nil {
 		log.Println("ndt: cannot read extended login")
 		return
@@ -58,7 +56,7 @@ func HandleControlConnection(cc net.Conn) {
 
 	// Write kickoff message
 
-	err = WriteRawString(cc, writer, "123456 654321")
+	err = WriteRawString(rdwr, "123456 654321")
 	if err != nil {
 		log.Println("ndt: cannot write kickoff message")
 		return
@@ -79,7 +77,7 @@ func HandleControlConnection(cc net.Conn) {
 			break
 		}
 		kv_test_pending_mutex.Unlock()
-		err = update_queue_pos(cc, reader, writer, 1)
+		err = update_queue_pos(rdwr, 1)
 		if err != nil {
 			log.Println("ndt: failed to update client of its queue position")
 			return
@@ -96,7 +94,7 @@ func HandleControlConnection(cc net.Conn) {
 
 	// Write queue empty message
 
-	err = WriteJsonMessage(cc, writer, KvSrvQueue, "0")
+	err = WriteJsonMessage(rdwr, KvSrvQueue, "0")
 	if err != nil {
 		log.Println("ndt: cannot write SRV_QUEUE message")
 		return
@@ -104,7 +102,7 @@ func HandleControlConnection(cc net.Conn) {
 
 	// Write server version to client
 
-	err = WriteJsonMessage(cc, writer, KvMsgLogin,
+	err = WriteJsonMessage(rdwr, KvMsgLogin,
 			"v3.7.0 (" + KvProduct + ")")
 	if err != nil {
 		log.Println("ndt: cannot send our version to client")
@@ -126,7 +124,7 @@ func HandleControlConnection(cc net.Conn) {
 	if (status & KvTestMeta) != 0 {
 		tests_message += strconv.Itoa(KvTestMeta)
 	}
-	err = WriteJsonMessage(cc, writer, KvMsgLogin, tests_message)
+	err = WriteJsonMessage(rdwr, KvMsgLogin, tests_message)
 	if err != nil {
 		log.Println("ndt: cannot send the list of tests to client")
 		return
@@ -135,21 +133,21 @@ func HandleControlConnection(cc net.Conn) {
 	// Run tests
 
 	if (status & KvTestS2cExt) != 0 {
-		err = RunS2cTest(cc, reader, writer, true)
+		err = RunS2cTest(rdwr, true)
 		if err != nil {
 			log.Println("ndt: failure to run s2c_ext test")
 			return
 		}
 	}
 	if (status & KvTestS2c) != 0 {
-		err = RunS2cTest(cc, reader, writer, false)
+		err = RunS2cTest(rdwr, false)
 		if err != nil {
 			log.Println("ndt: failure running s2c test")
 			return
 		}
 	}
 	if (status & KvTestMeta) != 0 {
-		err = RunMetaTest(cc, reader, writer)
+		err = RunMetaTest(rdwr)
 		if err != nil {
 			log.Println("ndt: failure running meta test")
 			return
@@ -165,7 +163,7 @@ func HandleControlConnection(cc net.Conn) {
 	 * Until we reach this point, send back a variable that NDT client
 	 * will ignore but that is consistent with what it would expect.
 	 */
-	err = WriteJsonMessage(cc, writer, KvMsgResults,
+	err = WriteJsonMessage(rdwr, KvMsgResults,
 		"botticelli_does_not_yet_collect_web100_data_sorry: 1\n")
 	if err != nil {
 		return
@@ -173,7 +171,7 @@ func HandleControlConnection(cc net.Conn) {
 
 	// Send empty MSG_LOGOUT to client
 
-	err = WriteJsonMessage(cc, writer, KvMsgLogout, "")
+	err = WriteJsonMessage(rdwr, KvMsgLogout, "")
 	if err != nil {
 		return
 	}

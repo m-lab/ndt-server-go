@@ -3,7 +3,6 @@ package protocol
 import (
 	"bufio"
 	"errors"
-	"net"
 	"log"
 )
 
@@ -16,18 +15,17 @@ import (
 
 */
 
-// RunMetaTest runs the META test. |reader| and |writer| are the buffered
-// reader and writer. |cc| is the connection. Returns the error.
-func RunMetaTest(cc net.Conn, reader *bufio.Reader,
-                   writer *bufio.Writer) error {
+// RunMetaTest runs the META test. |rdwr| is the buffered reader and writer
+// for the connection. Returns the error.
+func RunMetaTest(rdwr *bufio.ReadWriter) error {
 
 	// Send empty TEST_PREPARE and TEST_START messages to the client
 
-	err := WriteJsonMessage(cc, writer, KvTestPrepare, "")
+	err := WriteJsonMessage(rdwr, KvTestPrepare, "")
 	if err != nil {
 		return err
 	}
-	err = WriteJsonMessage(cc, writer, KvTestStart, "")
+	err = WriteJsonMessage(rdwr, KvTestStart, "")
 	if err != nil {
 		return err
 	}
@@ -35,7 +33,7 @@ func RunMetaTest(cc net.Conn, reader *bufio.Reader,
 	// Read a sequence of TEST_MSGs from client
 
 	for {
-		msg_type, msg_body, err := ReadJsonMessage(cc, reader)
+		msg_type, msg_body, err := ReadJsonMessage(rdwr)
 		if err != nil {
 			return err
 		}
@@ -50,5 +48,5 @@ func RunMetaTest(cc net.Conn, reader *bufio.Reader,
 
 	// Send empty TEST_FINALIZE to client
 
-	return WriteJsonMessage(cc, writer, KvTestFinalize, "")
+	return WriteJsonMessage(rdwr, KvTestFinalize, "")
 }

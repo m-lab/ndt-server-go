@@ -1,6 +1,7 @@
 package protocol
 
 import (
+	"github.com/m-lab/ndt-server-go/netx"
 	"github.com/m-lab/ndt-server-go/util"
 	"bufio"
 	"encoding/json"
@@ -28,12 +29,10 @@ type s2c_message_t struct {
 	TotalSentByte    string
 }
 
-// RunS2cTest runs the S2C test. |reader| and |writer| are respectively the
-// buffered reader and writer. |cc| is the control connection (we need to pass
-// it in order to set the I/O deadlines. |is_extended| is true when we want
-// to run a multi-stream test. Returns the error.
-func RunS2cTest(cc net.Conn, reader *bufio.Reader, writer *bufio.Writer,
-                is_extended bool) error {
+// RunS2cTest runs the S2C test. |rdwr| is the buffered reader and writer
+// for the connection. |is_extended| is true when we want to run a multi-stream
+// test. Returns the error.
+func RunS2cTest(rdwr *bufio.ReadWriter, is_extended bool) error {
 
 	// Bind port and tell the port number to the server
 	// TODO: choose a random port instead than an hardcoded port
@@ -47,11 +46,11 @@ func RunS2cTest(cc net.Conn, reader *bufio.Reader, writer *bufio.Writer,
 		prepare_message += " 10000.0 1 500.0 0.0 "
 		prepare_message += strconv.Itoa(kv_parallel_streams)
 	}
-	err = WriteJsonMessage(cc, writer, KvTestPrepare, prepare_message)
+	err = WriteJsonMessage(rdwr, KvTestPrepare, prepare_message)
 	if err != nil {
 		return err
 	}
-	defer listener.Close()
+	defer listener.Close() // XXX: leaking listener for some error paths
 
 	// Wait for client(s) to connect
 
@@ -71,7 +70,7 @@ func RunS2cTest(cc net.Conn, reader *bufio.Reader, writer *bufio.Writer,
 
 	// Send empty TEST_START message to tell the client to start
 
-	err = WriteJsonMessage(cc, writer, KvTestStart, "")
+	err = WriteJsonMessage(rdwr, KvTestStart, "")
 	if err != nil {
 		return err
 	}
@@ -96,16 +95,16 @@ func RunS2cTest(cc net.Conn, reader *bufio.Reader, writer *bufio.Writer,
 			// Send the buffer to the client for about ten seconds
 			// TODO: here we should take `web100` snapshots
 
-			conn_writer := bufio.NewWriter(conn)
+			conn_writer := bufio.NewWriter(netx.NewDeadlineConn(conn))
 			defer conn.Close()
 
 			for {
-				_, err = util.IoWrite(conn, conn_writer, output_buff)
+				_, err = conn_writer.Write(output_buff)
 				if err != nil {
 					log.Println("ndt: failed to write to client")
 					break
 				}
-				err = util.IoFlush(conn, conn_writer)
+				err = conn_writer.Flush()
 				if err != nil {
 					log.Println("ndt: cannot flush connection with client")
 					break
@@ -146,14 +145,14 @@ func RunS2cTest(cc net.Conn, reader *bufio.Reader, writer *bufio.Writer,
 	if err != nil {
 		return err
 	}
-	err = write_message_internal(cc, writer, KvTestMsg, data) // XXX
+	err = write_message_internal(rdwr, KvTestMsg, data) // XXX
 	if err != nil {
 		return err
 	}
 
 	// Receive message from client containing its measured speed
 
-	msg_type, msg_body, err := ReadJsonMessage(cc, reader)
+	msg_type, msg_body, err := ReadJsonMessage(rdwr)
 	if err != nil {
 		return err
 	}
@@ -166,5 +165,5 @@ func RunS2cTest(cc net.Conn, reader *bufio.Reader, writer *bufio.Writer,
 
 	// Send the TEST_FINALIZE message that concludes the test
 
-	return WriteJsonMessage(cc, writer, KvTestFinalize, "")
+	return WriteJsonMessage(rdwr, KvTestFinalize, "")
 }
