@@ -8,8 +8,11 @@ import (
 )
 
 const (
+	// HOST is the host to listen on
 	HOST = "localhost"
+	// PORT is the port to listen on
 	PORT = "3001"
+	// TYPE is the protocol to listen on
 	TYPE = "tcp"
 )
 
