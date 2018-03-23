@@ -52,7 +52,11 @@ func BenchmarkTCPInfo2(b *testing.B) {
 }
 
 func TestBasic(t *testing.T) {
-	ln, _ := net.Listen("tcp", ":0")
+	ln, err := net.Listen("tcp", ":0")
+	if err != nil {
+		fmt.Println("Error listening: ", err.Error())
+		t.Fatal("Listen failed")
+	}
 
 	var wg sync.WaitGroup
 	wg.Add(1)
