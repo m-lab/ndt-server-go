@@ -12,6 +12,11 @@ import (
 	"github.com/m-lab/ndt-server-go/tcpinfo"
 )
 
+func init() {
+	// Always prepend the filename and line number.
+	log.SetFlags(log.LstdFlags | log.Lshortfile)
+}
+
 func listen(ln net.Listener, wg *sync.WaitGroup) {
 	defer ln.Close()
 
