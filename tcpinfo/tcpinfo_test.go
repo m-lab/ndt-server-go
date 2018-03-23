@@ -35,18 +35,20 @@ func BenchmarkTCPInfo2(b *testing.B) {
 	dialer, err := net.Dial("tcp", ln.Addr().String())
 	if err != nil {
 		fmt.Println("Error dialing: ", err.Error())
-		os.Exit(1)
+		b.Error("Dial failed")
 	}
 	defer dialer.Close()
 
-	var info syscall.TCPInfo
+	var info *syscall.TCPInfo
 	b.ResetTimer()
 	for n := 0; n < b.N; n++ {
 		info, _ = tcpinfo.TCPInfo2(dialer.(*net.TCPConn))
 	}
 
 	wg.Done()
-	log.Printf("%+v\n", info)
+	if info != nil {
+		log.Printf("%+v\n", info)
+	}
 }
 
 func TestBasic(t *testing.T) {
@@ -59,12 +61,13 @@ func TestBasic(t *testing.T) {
 	dialer, err := net.Dial("tcp", ln.Addr().String())
 	if err != nil {
 		fmt.Println("Error dialing: ", err.Error())
-		os.Exit(1)
+		t.Fatal("Dial failed")
 	}
 	defer dialer.Close()
 
-	var info syscall.TCPInfo
-	info, _ = tcpinfo.TCPInfo2(dialer.(*net.TCPConn))
-	log.Printf("%+v\n", info)
+	info, _ := tcpinfo.TCPInfo2(dialer.(*net.TCPConn))
+	if info != nil {
+		log.Printf("%+v\n", info)
+	}
 
 }
