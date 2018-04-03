@@ -17,14 +17,14 @@ type DeadlineConn struct {
 	timeout time.Duration
 }
 
-// DefaultDeadlineConnTimeout is the default timeout used by DeadlineConn.
-const DefaultDeadlineConnTimeout = 10.0 * time.Second
+// DefaultTimeout is the default timeout used by DeadlineConn.
+const DefaultTimeout = 10.0 * time.Second
 
 // NewDeadlineConn creates a new DeadlineConn.
 func NewDeadlineConn(conn net.Conn) DeadlineConn {
 	return DeadlineConn{
 		Conn:    conn,
-		timeout: DefaultDeadlineConnTimeout,
+		timeout: DefaultTimeout,
 	}
 }
 
@@ -63,4 +63,19 @@ func (dc DeadlineConn) Write(data []byte) (int, error) {
 	// don't bother with resetting the deadline since it will be set
 	// again next time we call Write()
 	return dc.Conn.Write(data)
+}
+
+// NewTCPListenerWithDeadline constructs a TCPListener that has a specific
+// deadline after which all pending Accept()s will fail.
+func NewTCPListenerWithDeadline(address string, deadline time.Time) (net.Listener, error) {
+	listener, err := net.Listen("tcp", address)
+	if err != nil {
+		return nil, err
+	}
+	err = listener.(*net.TCPListener).SetDeadline(deadline)
+	if err != nil {
+		listener.Close()
+		return nil, err
+	}
+	return listener, nil
 }
