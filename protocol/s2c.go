@@ -37,10 +37,12 @@ func RunS2cTest(rdwr *bufio.ReadWriter, is_extended bool) error {
 	// Bind port and tell the port number to the server
 	// TODO: choose a random port instead than an hardcoded port
 
-	listener, err := net.Listen("tcp", ":3010")
+	deadline := time.Now().Add(netx.DefaultTimeout)
+	listener, err := netx.TCPListenerWithDeadline(":3010", deadline)
 	if err != nil {
 		return err
 	}
+	defer listener.Close()
 	prepare_message := "3010"
 	if is_extended {
 		prepare_message += " 10000.0 1 500.0 0.0 "
@@ -50,7 +52,6 @@ func RunS2cTest(rdwr *bufio.ReadWriter, is_extended bool) error {
 	if err != nil {
 		return err
 	}
-	defer listener.Close() // XXX: leaking listener for some error paths
 
 	// Wait for client(s) to connect
 
@@ -61,7 +62,7 @@ func RunS2cTest(rdwr *bufio.ReadWriter, is_extended bool) error {
 
 	conns := make([]net.Conn, nstreams)
 	for idx := 0; idx < len(conns); idx += 1 {
-		conn, err := util.IoAccept(listener)
+		conn, err := listener.Accept()
 		if err != nil {
 			return err
 		}
