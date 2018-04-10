@@ -154,7 +154,7 @@ func ReadExtendedLogin(rdwr *bufio.ReadWriter) (
 	if err != nil {
 		return nil, err
 	}
-	if msg_type != KvMsgExtendedLogin {
+	if msg_type != MsgExtendedLogin {
 		return nil, errors.New("ndt: received invalid message")
 	}
 
@@ -175,7 +175,7 @@ func ReadExtendedLogin(rdwr *bufio.ReadWriter) (
 		return nil, err
 	}
 	log.Printf("ndt: test suite as int: %d", el_msg.Tests)
-	if (el_msg.Tests & KvTestStatus) == 0 {
+	if (el_msg.Tests & TestStatus) == 0 {
 		return nil, errors.New("ndt: client does not support TEST_STATUS")
 	}
 

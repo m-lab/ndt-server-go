@@ -48,7 +48,7 @@ func RunS2cTest(rdwr *bufio.ReadWriter, is_extended bool) error {
 		prepare_message += " 10000.0 1 500.0 0.0 "
 		prepare_message += strconv.Itoa(kv_parallel_streams)
 	}
-	err = WriteJsonMessage(rdwr, KvTestPrepare, prepare_message)
+	err = WriteJsonMessage(rdwr, MsgTestPrepare, prepare_message)
 	if err != nil {
 		return err
 	}
@@ -71,7 +71,7 @@ func RunS2cTest(rdwr *bufio.ReadWriter, is_extended bool) error {
 
 	// Send empty TEST_START message to tell the client to start
 
-	err = WriteJsonMessage(rdwr, KvTestStart, "")
+	err = WriteJsonMessage(rdwr, MsgTestStart, "")
 	if err != nil {
 		return err
 	}
@@ -146,7 +146,7 @@ func RunS2cTest(rdwr *bufio.ReadWriter, is_extended bool) error {
 	if err != nil {
 		return err
 	}
-	err = write_message_internal(rdwr, KvTestMsg, data) // XXX
+	err = write_message_internal(rdwr, MsgTest, data) // XXX
 	if err != nil {
 		return err
 	}
@@ -157,7 +157,7 @@ func RunS2cTest(rdwr *bufio.ReadWriter, is_extended bool) error {
 	if err != nil {
 		return err
 	}
-	if msg_type != KvTestMsg {
+	if msg_type != MsgTest {
 		return errors.New("ndt: received unexpected message from client")
 	}
 	log.Printf("ndt: client measured speed: %s", msg_body)
@@ -166,5 +166,5 @@ func RunS2cTest(rdwr *bufio.ReadWriter, is_extended bool) error {
 
 	// Send the TEST_FINALIZE message that concludes the test
 
-	return WriteJsonMessage(rdwr, KvTestFinalize, "")
+	return WriteJsonMessage(rdwr, MsgTestFinalize, "")
 }
