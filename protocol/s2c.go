@@ -38,7 +38,7 @@ func RunS2cTest(rdwr *bufio.ReadWriter, is_extended bool) error {
 	// TODO: choose a random port instead than an hardcoded port
 
 	deadline := time.Now().Add(netx.DefaultTimeout)
-	listener, err := netx.TCPListenerWithDeadline(":3010", deadline)
+	listener, err := netx.NewTCPListenerWithDeadline(":3010", deadline)
 	if err != nil {
 		return err
 	}
