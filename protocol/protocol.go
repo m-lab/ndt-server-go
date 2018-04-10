@@ -46,7 +46,7 @@ const (
 	MsgLogout
 	// MsgWaiting tells a server that a client is alive.
 	MsgWaiting
-	// MsgExtendedLogin is the JSON-protocol loging message.
+	// MsgExtendedLogin is the JSON-protocol login message.
 	MsgExtendedLogin
 )
 
