@@ -4,13 +4,6 @@
 // Package protocol includes the NDT protocol elements
 package protocol
 
-/*
- * MSG_LOGIN uses binary protocol.
- * MSG_EXTENDED_LOGIN uses binary message types, but json message bodies.
- */
-
-// TODO(bassosimone): import the message codes from botticelli.
-
 import (
 	"bufio"
 	"encoding/binary"
@@ -21,8 +14,43 @@ import (
 	"strconv"
 )
 
+// Spec: https://github.com/ndt-project/ndt/wiki/NDTProtocol
+
 // TestCode is used to decode the tests bitvector.
 type TestCode int
+
+// Message types. Note: compared to the original specification, I have added
+// the `Msg` prefix to all messages not having it for clarity. Also, the
+// TEST_MSG define is mapped onto the MsgTest constant.
+
+const (
+	// MsgCommFailure indicates a communication link failure.
+	MsgCommFailure = byte(iota)
+	// MsgSrvQueue is used for queue management.
+	MsgSrvQueue
+	// MsgLogin is the legacy, binary protocol login message.
+	MsgLogin
+	// MsgTestPrepare is used to indicate test parameters.
+	MsgTestPrepare
+	// MsgTestStart is used to start a test.
+	MsgTestStart
+	// MsgTest is a message exchanged during a test.
+	MsgTest
+	// MsgTestFinalize is used to terminate a test.
+	MsgTestFinalize
+	// MsgError indicates an error during a test.
+	MsgError
+	// MsgResults contains the tests results.
+	MsgResults
+	// MsgLogout terminates a test session.
+	MsgLogout
+	// MsgWaiting tells a server that a client is alive.
+	MsgWaiting
+	// MsgExtendedLogin is the JSON-protocol loging message.
+	MsgExtendedLogin
+)
+
+// Test identifiers:
 
 const (
 	// TestMid is the middle boxes test.
@@ -37,6 +65,25 @@ const (
 	TestStatus
 	// TestMeta indicate that we will send metadata.
 	TestMeta
+	// TestC2SExt is the multi stream upload test.
+	TestC2SExt
+	// TestS2CExt is the multi stream download test.
+	TestS2CExt
+)
+
+// Queue states returned to client:
+
+const (
+	// SrvQueueTestStartsNow indicates that a test can start now.
+	SrvQueueTestStartsNow = "0"
+	// SrvQueueHeartbeat request client to tell us it's alive.
+	SrvQueueHeartbeat = "9990"
+	// SrvQueueServerFault indicates that the session must be terminated.
+	SrvQueueServerFault = "9977"
+	// SrvQueueServerBusy indicates that the server is busy.
+	SrvQueueServerBusy = "9987"
+	// SrvQueueServerBusy60s indicates that a server is busy for > 60 s.
+	SrvQueueServerBusy60s = "9999"
 )
 
 type header struct {
@@ -66,8 +113,12 @@ func ReadMessage(brdr *bufio.Reader) (Message, error) {
 		log.Println(err)
 		return Message{}, err
 	}
-	if get[0] > 11 {
-		// TODO
+	if get[0] > MsgExtendedLogin {
+		// TODO(bassosimone):
+		//
+		// If the message is greater than the extended loging message,
+		// we're going to assume that it's a WebSockets connection.
+		//
 		// Probably best way to handle this is to create a new connection
 		// to the websockets handler, and proxy everything from this
 		// connection to the websockets connection.  A little less ugly
@@ -106,7 +157,7 @@ type loginJSON struct {
 type Login struct {
 	Tests      byte   // The client test bits
 	Version    string // The client version string
-	IsExtended bool   // Type 11
+	IsExtended bool   // Type MsgExtendedLogin
 }
 
 // ReadLogin reads the initial login message.
@@ -117,11 +168,11 @@ func ReadLogin(brdr *bufio.Reader) (Login, error) {
 	}
 
 	switch msg.Header.MsgType {
-	case byte(2):
-		// TODO Handle legacy, without json
-		panic("Not implemented")
+	case MsgLogin:
+		// TODO(bassosimone): Handle legacy, without json
+		return Login{}, errors.New("not implemented")
 
-	case byte(11):
+	case MsgExtendedLogin:
 		// Handle extended, with json
 		lj := loginJSON{"foo", "bar"}
 		err := json.Unmarshal(msg.Content, &lj)
@@ -132,11 +183,14 @@ func ReadLogin(brdr *bufio.Reader) (Login, error) {
 		if err != nil {
 			log.Println("Error: ", err)
 		}
+		// TODO(bassosimone): handle the case where some of
+		// the fields were not part of the incoming msg.
 		return Login{byte(tests), lj.Msg, true}, err
+
 	default:
-		// NOTHING
+		// FALLTHROUGH
 	}
-	return Login{}, errors.New("Error")
+	return Login{}, errors.New("unhandled message type")
 }
 
 // SimpleMsg helps encoding json messages.
