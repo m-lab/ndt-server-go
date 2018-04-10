@@ -65,10 +65,9 @@ func (dc DeadlineConn) Write(data []byte) (int, error) {
 	return dc.Conn.Write(data)
 }
 
-// TCPListenerWithDeadline constructs a TCPListener that has a specific
+// NewTCPListenerWithDeadline constructs a TCPListener that has a specific
 // deadline after which all pending Accept()s will fail.
-func TCPListenerWithDeadline(
-	address string, deadline time.Time) (net.Listener, error) {
+func NewTCPListenerWithDeadline(address string, deadline time.Time) (net.Listener, error) {
 	listener, err := net.Listen("tcp", address)
 	if err != nil {
 		return nil, err
