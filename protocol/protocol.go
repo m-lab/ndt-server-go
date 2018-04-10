@@ -167,10 +167,14 @@ func ReadLogin(brdr *bufio.Reader) (Login, error) {
 		return Login{}, ErrIllegalMessageHeader
 	}
 
+	// Not WebSockets, then we can read an ordinary message.
+
 	msg, err := ReadMessage(brdr)
 	if err != nil {
 		return Login{}, err
 	}
+
+	// Make sure the message type is legit and further parse it.
 
 	switch msg.Header.MsgType {
 	case MsgLogin:
