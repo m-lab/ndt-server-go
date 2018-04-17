@@ -16,6 +16,9 @@ import (
 
 // Spec: https://github.com/ndt-project/ndt/wiki/NDTProtocol
 
+// TestCode is used to decode the tests bitvector.
+type TestCode int
+
 // Message types. Note: compared to the original specification, I have added
 // the `Msg` prefix to all messages not having it for clarity. Also, the
 // TEST_MSG define is mapped onto the MsgTest constant.
@@ -51,7 +54,7 @@ const (
 
 const (
 	// TestMid is the middle boxes test.
-	TestMid = 1 << iota
+	TestMid TestCode = 1 << iota
 	// TestC2S is the single-stream upload test.
 	TestC2S
 	// TestS2C is the single-stream download test.
