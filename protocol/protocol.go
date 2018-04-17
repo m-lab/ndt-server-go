@@ -179,6 +179,29 @@ type SimpleMsg struct {
 	Msg string `json:"msg, string"`
 }
 
+func ReadMessageJson(brdr *bufio.Reader) (Message, error) {
+	msg, err := ReadMessage(brdr)
+	if err != nil {
+		return Message{}, err
+	}
+	simple := &SimpleMsg{};
+	err = json.Unmarshal(msg.Content, &simple)
+	if err != nil {
+		return Message{}, err
+	}
+	nmsg := Message{};
+	nmsg.Header.MsgType = msg.Header.MsgType
+	// TODO(bassosimone): what is golang equivalent of INT_MAX?
+	if len(simple.Msg) > 0xffff {
+		panic("unexpected maximum message length")
+	}
+	nmsg.Header.Length = int16(len(simple.Msg))
+	// TODO(bassosimone): understand whether this is a string copy and
+	// if we can avoid this copy by using other types.
+	nmsg.Content = []byte(simple.Msg)
+	return nmsg, nil
+}
+
 // Send sends a raw message to the client.
 func Send(wr *bufio.Writer, t byte, msg []byte) error {
 	// Implementation note: here we could also use a net.Conn and a

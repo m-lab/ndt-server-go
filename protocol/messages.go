@@ -43,19 +43,14 @@ type json_message_t struct {
 // ReadJsonMessage reads a JSON encoded NDT message from |rdwr|. Returns a
 // triple: message type, message body decoded from JSON, error that occurred.
 func ReadJsonMessage(rdwr *bufio.ReadWriter) (byte, string, error) {
-	msg_type, msg_buff, err := read_message_internal(rdwr)
+	msg, err := ReadMessageJson(rdwr.Reader)
 	if err != nil {
 		return 0, "", err
 	}
-	s_msg := &json_message_t{}
-	err = json.Unmarshal(msg_buff, &s_msg)
-	if err != nil {
-		return 0, "", err
-	}
-	if s_msg == nil {
-		return 0, "", errors.New("ndt: received literal 'null'")
-	}
-	return msg_type, s_msg.Msg, nil
+	// TODO(bassosimone): apparently botticelli reasons in terms of
+	// (byte, string) tuple where the low level code reasons in terms
+	// of slices and this leads to unnecessary (IMHO) casting.
+	return msg.Header.MsgType, string(msg.Content), nil
 }
 
 func write_message_internal(rdwr *bufio.ReadWriter,
