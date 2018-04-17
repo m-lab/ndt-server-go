@@ -105,14 +105,8 @@ var ErrIllegalMessageHeader = errors.New("Illegal Message Header")
 func ReadMessage(brdr *bufio.Reader) (Message, error) {
 	// Implementation note: we use a buffered reader, so we're robust to
 	// the case in which we receive a batch of messages.
-	get, err := brdr.Peek(3)
-	if err != nil {
-		log.Println(err)
-		return Message{}, err
-	}
-
 	var hdr header
-	err = binary.Read(brdr, binary.BigEndian, &hdr)
+	err := binary.Read(brdr, binary.BigEndian, &hdr)
 	if err != nil {
 		log.Println(err)
 		return Message{}, err
