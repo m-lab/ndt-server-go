@@ -114,15 +114,15 @@ func HandleControlConnection(cc net.Conn) {
 	status := login_msg.Tests
 	tests_message := ""
 	if (status & TestS2CExt) != 0 {
-		tests_message += strconv.Itoa(TestS2CExt)
+		tests_message += strconv.Itoa(int(TestS2CExt))
 		tests_message += " "
 	}
 	if (status & TestS2C) != 0 {
-		tests_message += strconv.Itoa(TestS2C)
+		tests_message += strconv.Itoa(int(TestS2C))
 		tests_message += " "
 	}
 	if (status & TestMeta) != 0 {
-		tests_message += strconv.Itoa(TestMeta)
+		tests_message += strconv.Itoa(int(TestMeta))
 	}
 	err = WriteJsonMessage(rdwr, MsgLogin, tests_message)
 	if err != nil {

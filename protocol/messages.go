@@ -139,7 +139,7 @@ func WriteJsonMessage(rdwr *bufio.ReadWriter,
 type ExtendedLoginMessage struct {
 	Msg      string `json:"msg"`
 	TestsStr string `json:"tests"`
-	Tests    int
+	Tests    TestCode
 }
 
 // ReadExtendedLogin reads the extended loging message from |reader|. You also
@@ -170,11 +170,12 @@ func ReadExtendedLogin(rdwr *bufio.ReadWriter) (
 	}
 	log.Printf("ndt: client version: %s", el_msg.Msg)
 	log.Printf("ndt: test suite: %s", el_msg.TestsStr)
-	el_msg.Tests, err = strconv.Atoi(el_msg.TestsStr)
+	itests, err := strconv.Atoi(el_msg.TestsStr)
 	if err != nil {
 		return nil, err
 	}
-	log.Printf("ndt: test suite as int: %d", el_msg.Tests)
+	log.Printf("ndt: test suite as int: %d", itests)
+	el_msg.Tests = TestCode(itests)
 	if (el_msg.Tests & TestStatus) == 0 {
 		return nil, errors.New("ndt: client does not support TEST_STATUS")
 	}
