@@ -5,7 +5,6 @@ import (
 	"encoding/binary"
 	"encoding/json"
 	"errors"
-	"io"
 	"log"
 	"strconv"
 )
@@ -28,37 +27,13 @@ import (
 */
 
 func read_message_internal(rdwr *bufio.ReadWriter) (byte, []byte, error) {
-
-	// 1. read type
-
-	type_buff := make([]byte, 1)
-	_, err := io.ReadFull(rdwr.Reader, type_buff)
+	// TODO(bassosimone): further refactor this code so that we transition
+	// over to using only the reading code in protocol.go.
+	msg, err := ReadMessage(rdwr.Reader)
 	if err != nil {
 		return 0, nil, err
 	}
-	msg_type := type_buff[0]
-	log.Printf("ndt: message type: %d", msg_type)
-
-	// 2. read length
-
-	len_buff := make([]byte, 2)
-	_, err = io.ReadFull(rdwr.Reader, len_buff)
-	if err != nil {
-		return 0, nil, err
-	}
-	msg_length := binary.BigEndian.Uint16(len_buff)
-	log.Printf("ndt: message length: %d", msg_length)
-
-	// 3. read body
-
-	msg_body := make([]byte, msg_length)
-	_, err = io.ReadFull(rdwr.Reader, msg_body)
-	if err != nil {
-		return 0, nil, err
-	}
-	log.Printf("ndt: message body: '%s'\n", msg_body)
-
-	return msg_type, msg_body, nil
+	return msg.Header.MsgType, msg.Content, nil
 }
 
 type json_message_t struct {

@@ -111,8 +111,11 @@ func ReadMessage(brdr *bufio.Reader) (Message, error) {
 		log.Println(err)
 		return Message{}, err
 	}
-	log.Println(hdr)
+	log.Printf("ndt: message type: %d", hdr.MsgType)
+	log.Printf("ndt: message length: %d", hdr.Length)
 	content := make([]byte, hdr.Length)
+	// TODO(bassosimone): discuss with @gfr10598 whether here it makes
+	// sense to use a BigEndian reader since we're reading bytes.
 	err = binary.Read(brdr, binary.BigEndian, content)
 	// TODO(bassosimone): decide whether we want to tolerate EOF (it
 	// seems to me the original protocol does not).
@@ -120,6 +123,9 @@ func ReadMessage(brdr *bufio.Reader) (Message, error) {
 		log.Println(err)
 		return Message{}, err
 	}
+	// TODO(bassosimone): what is the Go idiomatic way of having a logger
+	// with different logging levels (this is probably LOG_DEBUG)?
+	log.Printf("ndt: message body: '%s'\n", content)
 	return Message{hdr, content}, nil
 }
 
