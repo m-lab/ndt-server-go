@@ -22,7 +22,6 @@ type TestCode int
 // Message types. Note: compared to the original specification, I have added
 // the `Msg` prefix to all messages not having it for clarity. Also, the
 // TEST_MSG define is mapped onto the MsgTest constant.
-
 const (
 	// MsgCommFailure indicates a communication link failure.
 	MsgCommFailure = byte(iota)
@@ -51,7 +50,6 @@ const (
 )
 
 // Test identifiers:
-
 const (
 	// TestMid is the middle boxes test.
 	TestMid TestCode = 1 << iota
@@ -72,7 +70,6 @@ const (
 )
 
 // Queue states returned to client:
-
 const (
 	// SrvQueueTestStartsNow indicates that a test can start now.
 	SrvQueueTestStartsNow = "0"
@@ -112,22 +109,6 @@ func ReadMessage(brdr *bufio.Reader) (Message, error) {
 	if err != nil {
 		log.Println(err)
 		return Message{}, err
-	}
-	if get[0] > MsgExtendedLogin {
-		// TODO(bassosimone):
-		//
-		// If the message is greater than the extended loging message,
-		// we're going to assume that it's a WebSockets connection.
-		//
-		// Probably best way to handle this is to create a new connection
-		// to the websockets handler, and proxy everything from this
-		// connection to the websockets connection.  A little less ugly
-		// than the alternatives.
-		for i := 0; i < 8; i++ {
-			line, _ := brdr.ReadString('\n')
-			log.Printf("%s", string(line))
-		}
-		return Message{}, ErrIllegalMessageHeader
 	}
 
 	var hdr header
