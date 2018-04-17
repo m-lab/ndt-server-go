@@ -26,16 +26,6 @@ import (
 	Message serialization and deserialization.
 */
 
-func read_message_internal(rdwr *bufio.ReadWriter) (byte, []byte, error) {
-	// TODO(bassosimone): further refactor this code so that we transition
-	// over to using only the reading code in protocol.go.
-	msg, err := ReadMessage(rdwr.Reader)
-	if err != nil {
-		return 0, nil, err
-	}
-	return msg.Header.MsgType, msg.Content, nil
-}
-
 type json_message_t struct {
 	Msg string `json:"msg"`
 }
@@ -117,39 +107,17 @@ type ExtendedLoginMessage struct {
 // function returns a tuple: the extended-loging-message pointer and the error.
 func ReadExtendedLogin(rdwr *bufio.ReadWriter) (
                        *ExtendedLoginMessage, error) {
-
-	// Read ordinary message
-
-	msg_type, msg_buff, err := read_message_internal(rdwr)
-	if err != nil {
-		return nil, err
-	}
-	if msg_type != MsgExtendedLogin {
-		return nil, errors.New("ndt: received invalid message")
-	}
-
-	// Process input as JSON message and validate its fields
-
 	el_msg := &ExtendedLoginMessage{}
-	err = json.Unmarshal(msg_buff, &el_msg)
+	login, err := ReadLogin(rdwr.Reader)
 	if err != nil {
 		return nil, err
 	}
-	if el_msg == nil {
-		return nil, errors.New("ndt: received literal 'null'")
+	if !login.IsExtended {
+		panic("unexpected message type")
 	}
-	log.Printf("ndt: client version: %s", el_msg.Msg)
-	log.Printf("ndt: test suite: %s", el_msg.TestsStr)
-	itests, err := strconv.Atoi(el_msg.TestsStr)
-	if err != nil {
-		return nil, err
-	}
-	log.Printf("ndt: test suite as int: %d", itests)
-	el_msg.Tests = TestCode(itests)
-	if (el_msg.Tests & TestStatus) == 0 {
-		return nil, errors.New("ndt: client does not support TEST_STATUS")
-	}
-
+	el_msg.Tests = login.Tests
+	el_msg.TestsStr = strconv.Itoa(int(login.Tests))
+	el_msg.Msg = login.Version
 	return el_msg, nil
 }
 

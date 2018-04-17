@@ -19,6 +19,9 @@ import (
 // TestCode is used to decode the tests bitvector.
 type TestCode int
 
+// TODO(bassosimone): we should probably also have a define for the
+// type of message that we can receive rather than using `byte`
+
 // Message types. Note: compared to the original specification, I have added
 // the `Msg` prefix to all messages not having it for clarity. Also, the
 // TEST_MSG define is mapped onto the MsgTest constant.
@@ -136,9 +139,9 @@ type loginJSON struct {
 
 // Login represents a client login message.
 type Login struct {
-	Tests      byte   // The client test bits
-	Version    string // The client version string
-	IsExtended bool   // Type MsgExtendedLogin
+	Tests      TestCode   // The client test bits
+	Version    string     // The client version string
+	IsExtended bool       // Type MsgExtendedLogin
 }
 
 // ReadLogin reads the initial login message.
@@ -153,20 +156,39 @@ func ReadLogin(brdr *bufio.Reader) (Login, error) {
 		// TODO(bassosimone): Handle legacy, without json
 		return Login{}, errors.New("not implemented")
 
-	case MsgExtendedLogin:
-		// Handle extended, with json
+	case MsgExtendedLogin: // Handle extended login, i.e. with JSON
 		lj := loginJSON{"foo", "bar"}
 		err := json.Unmarshal(msg.Content, &lj)
 		if err != nil {
 			log.Println("Error: ", err)
+			return Login{}, err
+		}
+		// TODO(bassosimone): what is the idiomatic way for this? Do
+		// we need to also check other parts of the code base?
+		//
+		// Or was that caused by the fact that in botticelli I was
+		// passing to Unmarshal a pointer to a pointer?
+		/*
+			in botticelli:
+		if lj == nil {
+			return Login{}, errors.New("received literal null")
+		}
+		*/
+		if lj.Msg == "foo" || lj.Tests == "bar" {
+			return Login{}, errors.New("invalid message")
 		}
 		tests, err := strconv.Atoi(lj.Tests)
 		if err != nil {
 			log.Println("Error: ", err)
+			return Login{}, err
 		}
-		// TODO(bassosimone): handle the case where some of
-		// the fields were not part of the incoming msg.
-		return Login{byte(tests), lj.Msg, true}, err
+		log.Printf("ndt: client version: %s", lj.Msg)
+		log.Printf("ndt: test suite: %s", lj.Tests)
+		login := Login{TestCode(tests), lj.Msg, true}
+		if (login.Tests & TestStatus) == 0 {
+			return Login{}, errors.New("missing TEST_STATUS")
+		}
+		return login, nil
 
 	default:
 		// FALLTHROUGH
