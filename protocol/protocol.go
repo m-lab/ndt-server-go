@@ -105,8 +105,30 @@ var ErrIllegalMessageHeader = errors.New("Illegal Message Header")
 func ReadMessage(brdr *bufio.Reader) (Message, error) {
 	// Implementation note: we use a buffered reader, so we're robust to
 	// the case in which we receive a batch of messages.
+	get, err := brdr.Peek(3)
+	if err != nil {
+		log.Println(err)
+		return Message{}, err
+	}
+	if get[0] > MsgExtendedLogin {
+		// TODO(bassosimone):
+		//
+		// If the message is greater than the extended loging message,
+		// we're going to assume that it's a WebSockets connection.
+		//
+		// Probably best way to handle this is to create a new connection
+		// to the websockets handler, and proxy everything from this
+		// connection to the websockets connection.  A little less ugly
+		// than the alternatives.
+		for i := 0; i < 8; i++ {
+			line, _ := brdr.ReadString('\n')
+			log.Printf("%s", string(line))
+		}
+		return Message{}, ErrIllegalMessageHeader
+	}
+
 	var hdr header
-	err := binary.Read(brdr, binary.BigEndian, &hdr)
+	err = binary.Read(brdr, binary.BigEndian, &hdr)
 	if err != nil {
 		log.Println(err)
 		return Message{}, err
@@ -136,37 +158,7 @@ type Login struct {
 }
 
 // ReadLogin reads the initial login message.
-// TODO(bassosimone): this function should become a factory where
-// we receive in input a `*bufio.ReadWriter` and we return, in
-// addition to `(Login, error)` also a `ControlConnection` struct
-// that depends on the protocol used (legacy, JSON, WebSockets).
 func ReadLogin(brdr *bufio.Reader) (Login, error) {
-
-	// Sniff bytes and check whether we're receiving a WebSockets
-	// message rather than a normal NDT message.
-
-	get, err := brdr.Peek(3)
-	if err != nil {
-		log.Println(err)
-		return Login{}, err
-	}
-	if get[0] > MsgExtendedLogin {
-		// TODO(bassosimone):
-		//
-		// If the message is greater than the extended loging message,
-		// we're going to assume that it's a WebSockets connection.
-		//
-		// Probably best way to handle this is to create a new connection
-		// to the websockets handler, and proxy everything from this
-		// connection to the websockets connection.  A little less ugly
-		// than the alternatives.
-		for i := 0; i < 8; i++ {
-			line, _ := brdr.ReadString('\n')
-			log.Printf("%s", string(line))
-		}
-		return Login{}, ErrIllegalMessageHeader
-	}
-
 	msg, err := ReadMessage(brdr)
 	if err != nil {
 		return Login{}, err
