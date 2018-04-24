@@ -163,6 +163,7 @@ func ReadLogin(brdr *bufio.Reader) (Login, error) {
 		return Login{byte(tests), lj.Msg, true}, err
 
 	default:
+		log.Println("Unhandled message type (WebSockets?)")
 		return Login{}, errors.New("unhandled message type")
 	}
 }
