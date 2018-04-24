@@ -189,11 +189,10 @@ func ReadLogin(brdr *bufio.Reader) (Login, error) {
 			return Login{}, errors.New("missing TEST_STATUS")
 		}
 		return login, nil
-
 	default:
-		// FALLTHROUGH
+		log.Println("Unhandled message type (WebSockets?)")
+		return Login{}, errors.New("unhandled message type")
 	}
-	return Login{}, errors.New("unhandled message type")
 }
 
 // SimpleMsg helps encoding json messages.
