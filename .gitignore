@@ -14,5 +14,5 @@
 .glide/
 
 # Executable
-/ndt-server-go.exe
-/ndt-server-go
+/ndt-server.exe
+/ndt-server
