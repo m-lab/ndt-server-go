@@ -1,9 +1,10 @@
-package protocol
+package nettests
 
 import (
 	"bufio"
 	"encoding/json"
 	"errors"
+	"github.com/m-lab/ndt-server-go/protocol"
 	"github.com/m-lab/ndt-server-go/netx"
 	"github.com/m-lab/ndt-server-go/util"
 	"log"
@@ -11,15 +12,6 @@ import (
 	"strconv"
 	"time"
 )
-
-/*
- ____ ____   ____
-/ ___|___ \ / ___|
-\___ \ __) | |
- ___) / __/| |___
-|____/_____|\____|
-
-*/
 
 const kv_parallel_streams int = 3
 
@@ -48,7 +40,7 @@ func RunS2cTest(rdwr *bufio.ReadWriter, is_extended bool) error {
 		prepare_message += " 10000.0 1 500.0 0.0 "
 		prepare_message += strconv.Itoa(kv_parallel_streams)
 	}
-	err = SendSimpleMsg(rdwr.Writer, MsgTestPrepare, prepare_message)
+	err = protocol.SendSimpleMsg(rdwr.Writer, protocol.MsgTestPrepare, prepare_message)
 	if err != nil {
 		return err
 	}
@@ -71,7 +63,7 @@ func RunS2cTest(rdwr *bufio.ReadWriter, is_extended bool) error {
 
 	// Send empty TEST_START message to tell the client to start
 
-	err = SendSimpleMsg(rdwr.Writer, MsgTestStart, "")
+	err = protocol.SendSimpleMsg(rdwr.Writer, protocol.MsgTestStart, "")
 	if err != nil {
 		return err
 	}
@@ -146,19 +138,19 @@ func RunS2cTest(rdwr *bufio.ReadWriter, is_extended bool) error {
 	if err != nil {
 		return err
 	}
-	err = Send(rdwr.Writer, MsgTest, data)
+	err = protocol.Send(rdwr.Writer, protocol.MsgTest, data)
 	if err != nil {
 		return err
 	}
 
 	// Receive message from client containing its measured speed
 
-	msg, err := ReadMessageJson(rdwr.Reader)
+	msg, err := protocol.ReadMessageJson(rdwr.Reader)
 	if err != nil {
 		return err
 	}
 	msgType := msg.Header.MsgType
-	if msgType != MsgTest {
+	if msgType != protocol.MsgTest {
 		return errors.New("ndt: received unexpected message from client")
 	}
 	msgBody := string(msg.Content)
@@ -168,5 +160,5 @@ func RunS2cTest(rdwr *bufio.ReadWriter, is_extended bool) error {
 
 	// Send the TEST_FINALIZE message that concludes the test
 
-	return SendSimpleMsg(rdwr.Writer, MsgTestFinalize, "")
+	return protocol.SendSimpleMsg(rdwr.Writer, protocol.MsgTestFinalize, "")
 }

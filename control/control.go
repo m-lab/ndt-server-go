@@ -1,8 +1,10 @@
-package protocol
+package control
 
 import (
 	"bufio"
 	"errors"
+	"github.com/m-lab/ndt-server-go/nettests"
+	"github.com/m-lab/ndt-server-go/protocol"
 	"github.com/m-lab/ndt-server-go/netx"
 	"log"
 	"net"
@@ -16,20 +18,20 @@ import (
 */
 
 func update_queue_pos(rdwr *bufio.ReadWriter, position int) error {
-	err := SendSimpleMsg(rdwr.Writer, MsgSrvQueue, strconv.Itoa(position))
+	err := protocol.SendSimpleMsg(rdwr.Writer, protocol.MsgSrvQueue, strconv.Itoa(position))
 	if err != nil {
 		return errors.New("ndt: cannot write SRV_QUEUE message")
 	}
-	err = SendSimpleMsg(rdwr.Writer, MsgSrvQueue, SrvQueueHeartbeat)
+	err = protocol.SendSimpleMsg(rdwr.Writer, protocol.MsgSrvQueue, protocol.SrvQueueHeartbeat)
 	if err != nil {
 		return errors.New("ndt: cannot write SRV_QUEUE heartbeat message")
 	}
-	msg, err := ReadMessageJson(rdwr.Reader)
+	msg, err := protocol.ReadMessageJson(rdwr.Reader)
 	if err != nil {
 		return errors.New("ndt: cannot read MSG_WAITING message")
 	}
 	msgType := msg.Header.MsgType
-	if msgType != MsgWaiting {
+	if msgType != protocol.MsgWaiting {
 		return errors.New("ndt: received unexpected message from client")
 	}
 	return nil
@@ -49,7 +51,7 @@ func HandleControlConnection(cc net.Conn) {
 
 	// Read extended login message
 
-	login, err := ReadLogin(rdwr.Reader)
+	login, err := protocol.ReadLogin(rdwr.Reader)
 	if err != nil || login.IsExtended == false {
 		log.Println("ndt: cannot read extended login message")
 		return
@@ -101,7 +103,7 @@ func HandleControlConnection(cc net.Conn) {
 
 	// Write queue empty message
 
-	err = SendSimpleMsg(rdwr.Writer, MsgSrvQueue, "0")
+	err = protocol.SendSimpleMsg(rdwr.Writer, protocol.MsgSrvQueue, "0")
 	if err != nil {
 		log.Println("ndt: cannot write SRV_QUEUE message")
 		return
@@ -109,7 +111,7 @@ func HandleControlConnection(cc net.Conn) {
 
 	// Write server version to client
 
-	err = SendSimpleMsg(rdwr.Writer, MsgLogin,
+	err = protocol.SendSimpleMsg(rdwr.Writer, protocol.MsgLogin,
 		"v3.7.0 ("+KvProduct+")")
 	if err != nil {
 		log.Println("ndt: cannot send our version to client")
@@ -120,18 +122,18 @@ func HandleControlConnection(cc net.Conn) {
 
 	status := login.Tests
 	tests_message := ""
-	if (status & TestS2CExt) != 0 {
-		tests_message += strconv.Itoa(int(TestS2CExt))
+	if (status & protocol.TestS2CExt) != 0 {
+		tests_message += strconv.Itoa(int(protocol.TestS2CExt))
 		tests_message += " "
 	}
-	if (status & TestS2C) != 0 {
-		tests_message += strconv.Itoa(int(TestS2C))
+	if (status & protocol.TestS2C) != 0 {
+		tests_message += strconv.Itoa(int(protocol.TestS2C))
 		tests_message += " "
 	}
-	if (status & TestMeta) != 0 {
-		tests_message += strconv.Itoa(int(TestMeta))
+	if (status & protocol.TestMeta) != 0 {
+		tests_message += strconv.Itoa(int(protocol.TestMeta))
 	}
-	err = SendSimpleMsg(rdwr.Writer, MsgLogin, tests_message)
+	err = protocol.SendSimpleMsg(rdwr.Writer, protocol.MsgLogin, tests_message)
 	if err != nil {
 		log.Println("ndt: cannot send the list of tests to client")
 		return
@@ -139,22 +141,22 @@ func HandleControlConnection(cc net.Conn) {
 
 	// Run tests
 
-	if (status & TestS2CExt) != 0 {
-		err = RunS2cTest(rdwr, true)
+	if (status & protocol.TestS2CExt) != 0 {
+		err = nettests.RunS2cTest(rdwr, true)
 		if err != nil {
 			log.Println("ndt: failure to run s2c_ext test")
 			return
 		}
 	}
-	if (status & TestS2C) != 0 {
-		err = RunS2cTest(rdwr, false)
+	if (status & protocol.TestS2C) != 0 {
+		err = nettests.RunS2cTest(rdwr, false)
 		if err != nil {
 			log.Println("ndt: failure running s2c test")
 			return
 		}
 	}
-	if (status & TestMeta) != 0 {
-		err = RunMetaTest(rdwr)
+	if (status & protocol.TestMeta) != 0 {
+		err = nettests.RunMetaTest(rdwr)
 		if err != nil {
 			log.Println("ndt: failure running meta test")
 			return
@@ -170,7 +172,7 @@ func HandleControlConnection(cc net.Conn) {
 	 * Until we reach this point, send back a variable that NDT client
 	 * will ignore but that is consistent with what it would expect.
 	 */
-	err = SendSimpleMsg(rdwr.Writer, MsgResults,
+	err = protocol.SendSimpleMsg(rdwr.Writer, protocol.MsgResults,
 		"botticelli_does_not_yet_collect_web100_data_sorry: 1\n")
 	if err != nil {
 		return
@@ -178,7 +180,7 @@ func HandleControlConnection(cc net.Conn) {
 
 	// Send empty MSG_LOGOUT to client
 
-	err = SendSimpleMsg(rdwr.Writer, MsgLogout, "")
+	err = protocol.SendSimpleMsg(rdwr.Writer, protocol.MsgLogout, "")
 	if err != nil {
 		return
 	}

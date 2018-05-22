@@ -2,7 +2,7 @@ package main
 
 import (
 	"fmt"
-	"github.com/m-lab/ndt-server-go/protocol"
+	"github.com/m-lab/ndt-server-go/control"
 	"net"
 	"os"
 )
@@ -36,6 +36,6 @@ func main() {
 			os.Exit(1)
 		}
 		// Handle connections in a new goroutine.
-		go protocol.HandleControlConnection(conn)
+		go control.HandleControlConnection(conn)
 	}
 }
