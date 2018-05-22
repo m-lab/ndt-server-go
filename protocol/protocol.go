@@ -139,9 +139,9 @@ type loginJSON struct {
 
 // Login represents a client login message.
 type Login struct {
-	Tests      TestCode   // The client test bits
-	Version    string     // The client version string
-	IsExtended bool       // Type MsgExtendedLogin
+	Tests      TestCode // The client test bits
+	Version    string   // The client version string
+	IsExtended bool     // Type MsgExtendedLogin
 }
 
 // ReadLogin reads the initial login message.
@@ -169,10 +169,10 @@ func ReadLogin(brdr *bufio.Reader) (Login, error) {
 		// Or was that caused by the fact that in botticelli I was
 		// passing to Unmarshal a pointer to a pointer?
 		/*
-			in botticelli:
-		if lj == nil {
-			return Login{}, errors.New("received literal null")
-		}
+				in botticelli:
+			if lj == nil {
+				return Login{}, errors.New("received literal null")
+			}
 		*/
 		if lj.Msg == "foo" || lj.Tests == "bar" {
 			return Login{}, errors.New("invalid message")
@@ -205,12 +205,12 @@ func ReadMessageJson(brdr *bufio.Reader) (Message, error) {
 	if err != nil {
 		return Message{}, err
 	}
-	simple := &SimpleMsg{};
+	simple := &SimpleMsg{}
 	err = json.Unmarshal(msg.Content, &simple)
 	if err != nil {
 		return Message{}, err
 	}
-	nmsg := Message{};
+	nmsg := Message{}
 	nmsg.Header.MsgType = msg.Header.MsgType
 	// TODO(bassosimone): what is golang equivalent of INT_MAX?
 	if len(simple.Msg) > 0xffff {

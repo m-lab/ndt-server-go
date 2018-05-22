@@ -1,11 +1,11 @@
 package protocol
 
 import (
-	"github.com/m-lab/ndt-server-go/netx"
-	"github.com/m-lab/ndt-server-go/util"
 	"bufio"
 	"encoding/json"
 	"errors"
+	"github.com/m-lab/ndt-server-go/netx"
+	"github.com/m-lab/ndt-server-go/util"
 	"log"
 	"net"
 	"strconv"
@@ -117,8 +117,8 @@ func RunS2cTest(rdwr *bufio.ReadWriter, is_extended bool) error {
 				}
 			}
 
-			conn.Close()   // Explicit to notify the client we're done
-			channel <- -1  // Tell the controller we're done
+			conn.Close()  // Explicit to notify the client we're done
+			channel <- -1 // Tell the controller we're done
 		}(conns[idx])
 	}
 
@@ -126,7 +126,7 @@ func RunS2cTest(rdwr *bufio.ReadWriter, is_extended bool) error {
 	for num_complete := 0; num_complete < len(conns); {
 		count := <-channel
 		if count < 0 {
-			log.Printf("ndt: a stream just terminated...");
+			log.Printf("ndt: a stream just terminated...")
 			num_complete += 1
 			continue
 		}
@@ -153,14 +153,16 @@ func RunS2cTest(rdwr *bufio.ReadWriter, is_extended bool) error {
 
 	// Receive message from client containing its measured speed
 
-	msg_type, msg_body, err := ReadJsonMessage(rdwr)
+	msg, err := ReadMessageJson(rdwr.Reader)
 	if err != nil {
 		return err
 	}
-	if msg_type != MsgTest {
+	msgType := msg.Header.MsgType
+	if msgType != MsgTest {
 		return errors.New("ndt: received unexpected message from client")
 	}
-	log.Printf("ndt: client measured speed: %s", msg_body)
+	msgBody := string(msg.Content)
+	log.Printf("ndt: client measured speed: %s", msgBody)
 
 	// FIXME: here we should send the web100 variables
 

@@ -33,17 +33,19 @@ func RunMetaTest(rdwr *bufio.ReadWriter) error {
 	// Read a sequence of TEST_MSGs from client
 
 	for {
-		msg_type, msg_body, err := ReadJsonMessage(rdwr)
+		msg, err := ReadMessageJson(rdwr.Reader)
 		if err != nil {
 			return err
 		}
-		if msg_type != MsgTest {
+		msgType := msg.Header.MsgType
+		msgBody := string(msg.Content)
+		if msgType != MsgTest {
 			return errors.New("ndt: expected TEST_MSG from client")
 		}
-		if msg_body == "" {
+		if msgBody == "" {
 			break
 		}
-		log.Printf("ndt: metadata from client: %s", msg_body)
+		log.Printf("ndt: metadata from client: %s", msgBody)
 	}
 
 	// Send empty TEST_FINALIZE to client

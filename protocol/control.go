@@ -4,8 +4,8 @@ import (
 	"bufio"
 	"errors"
 	"github.com/m-lab/ndt-server-go/netx"
-	"net"
 	"log"
+	"net"
 	"strconv"
 	"sync"
 	"time"
@@ -24,11 +24,12 @@ func update_queue_pos(rdwr *bufio.ReadWriter, position int) error {
 	if err != nil {
 		return errors.New("ndt: cannot write SRV_QUEUE heartbeat message")
 	}
-	msg_type, _, err := ReadJsonMessage(rdwr)
+	msg, err := ReadMessageJson(rdwr.Reader)
 	if err != nil {
 		return errors.New("ndt: cannot read MSG_WAITING message")
 	}
-	if msg_type != MsgWaiting {
+	msgType := msg.Header.MsgType
+	if msgType != MsgWaiting {
 		return errors.New("ndt: received unexpected message from client")
 	}
 	return nil
@@ -103,7 +104,7 @@ func HandleControlConnection(cc net.Conn) {
 	// Write server version to client
 
 	err = WriteJsonMessage(rdwr, MsgLogin,
-			"v3.7.0 (" + KvProduct + ")")
+		"v3.7.0 ("+KvProduct+")")
 	if err != nil {
 		log.Println("ndt: cannot send our version to client")
 		return

@@ -30,21 +30,8 @@ type json_message_t struct {
 	Msg string `json:"msg"`
 }
 
-// ReadJsonMessage reads a JSON encoded NDT message from |rdwr|. Returns a
-// triple: message type, message body decoded from JSON, error that occurred.
-func ReadJsonMessage(rdwr *bufio.ReadWriter) (byte, string, error) {
-	msg, err := ReadMessageJson(rdwr.Reader)
-	if err != nil {
-		return 0, "", err
-	}
-	// TODO(bassosimone): apparently botticelli reasons in terms of
-	// (byte, string) tuple where the low level code reasons in terms
-	// of slices and this leads to unnecessary (IMHO) casting.
-	return msg.Header.MsgType, string(msg.Content), nil
-}
-
 func write_message_internal(rdwr *bufio.ReadWriter,
-                            message_type byte, encoded_body []byte) error {
+	message_type byte, encoded_body []byte) error {
 
 	log.Printf("ndt: write any message: type=%d\n", message_type)
 	log.Printf("ndt: write any message: length=%d\n", len(encoded_body))
@@ -81,7 +68,7 @@ func write_message_internal(rdwr *bufio.ReadWriter,
 // WriteJsonMessage encodes as JSON and writes on |rdwr| the NDT message
 // with type |message_type| and body |message_body|.
 func WriteJsonMessage(rdwr *bufio.ReadWriter,
-                      message_type byte, message_body string) error {
+	message_type byte, message_body string) error {
 
 	s_msg := &json_message_t{
 		Msg: message_body,
@@ -106,7 +93,7 @@ type ExtendedLoginMessage struct {
 // need to supply |cc| because we need to set the read deadline on it. This
 // function returns a tuple: the extended-loging-message pointer and the error.
 func ReadExtendedLogin(rdwr *bufio.ReadWriter) (
-                       *ExtendedLoginMessage, error) {
+	*ExtendedLoginMessage, error) {
 	el_msg := &ExtendedLoginMessage{}
 	login, err := ReadLogin(rdwr.Reader)
 	if err != nil {

@@ -1,8 +1,8 @@
 package main
 
 import (
-	"github.com/m-lab/ndt-server-go/protocol"
 	"fmt"
+	"github.com/m-lab/ndt-server-go/protocol"
 	"net"
 	"os"
 )
