@@ -74,8 +74,7 @@ func HandleControlConnection(cc net.Conn) {
 	}
 
 	// Write server version to client
-	err = protocol.SendSimpleMsg(rdwr.Writer, protocol.MsgLogin,
-		"v3.7.0 ("+serverName+")")
+	err = protocol.SendSimpleMsg(rdwr.Writer, protocol.MsgLogin, "v3.7.0 ("+serverName+")")
 	if err != nil {
 		log.Println("ndt: cannot send our version to client")
 		return
