@@ -54,8 +54,7 @@ func HandleControlConnection(cc net.Conn) {
 	testsRunningMutex.Unlock()
 	if !canContinue {
 		log.Println("ndt: too many running tests")
-		serverBusy := "9988"
-		protocol.SendSimpleMsg(rdwr.Writer, protocol.MsgSrvQueue, serverBusy)
+		protocol.SendSimpleMsg(rdwr.Writer, protocol.MsgSrvQueue, protocol.SrvQueueServerBusy)
 		return
 	}
 

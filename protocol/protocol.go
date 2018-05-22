@@ -81,7 +81,7 @@ const (
 	// SrvQueueServerFault indicates that the session must be terminated.
 	SrvQueueServerFault = "9977"
 	// SrvQueueServerBusy indicates that the server is busy.
-	SrvQueueServerBusy = "9987"
+	SrvQueueServerBusy = "9988"
 	// SrvQueueServerBusy60s indicates that a server is busy for > 60 s.
 	SrvQueueServerBusy60s = "9999"
 )
