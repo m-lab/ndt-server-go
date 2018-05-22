@@ -27,15 +27,18 @@ type s2cMessage struct {
 func RunS2CTest(rdwr *bufio.ReadWriter, isExtended bool) error {
 
 	// Bind port and tell the port number to the client
-	// TODO: choose a random port instead than an hardcoded port
-
 	deadline := time.Now().Add(netx.DefaultTimeout)
-	listener, err := netx.NewTCPListenerWithDeadline(":3010", deadline)
+	listener, err := netx.NewTCPListenerWithDeadline(":0", deadline)
 	if err != nil {
 		return err
 	}
 	defer listener.Close()
-	prepareMessage := "3010"
+	tcpAddr, okay := listener.Addr().(*net.TCPAddr)
+	if !okay {
+		panic("cannot convert Addr to TCPAddr")
+	}
+	log.Printf("Listening on port: %d\n", tcpAddr.Port)
+	prepareMessage := strconv.Itoa(tcpAddr.Port)
 	if isExtended {
 		prepareMessage += " 10000.0 1 500.0 0.0 "
 		prepareMessage += strconv.Itoa(numParallelStreams)
