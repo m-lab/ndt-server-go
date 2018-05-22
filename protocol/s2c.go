@@ -48,7 +48,7 @@ func RunS2cTest(rdwr *bufio.ReadWriter, is_extended bool) error {
 		prepare_message += " 10000.0 1 500.0 0.0 "
 		prepare_message += strconv.Itoa(kv_parallel_streams)
 	}
-	err = WriteJsonMessage(rdwr, MsgTestPrepare, prepare_message)
+	err = SendSimpleMsg(rdwr.Writer, MsgTestPrepare, prepare_message)
 	if err != nil {
 		return err
 	}
@@ -71,7 +71,7 @@ func RunS2cTest(rdwr *bufio.ReadWriter, is_extended bool) error {
 
 	// Send empty TEST_START message to tell the client to start
 
-	err = WriteJsonMessage(rdwr, MsgTestStart, "")
+	err = SendSimpleMsg(rdwr.Writer, MsgTestStart, "")
 	if err != nil {
 		return err
 	}
@@ -146,7 +146,7 @@ func RunS2cTest(rdwr *bufio.ReadWriter, is_extended bool) error {
 	if err != nil {
 		return err
 	}
-	err = write_message_internal(rdwr, MsgTest, data) // XXX
+	err = Send(rdwr.Writer, MsgTest, data)
 	if err != nil {
 		return err
 	}
@@ -168,5 +168,5 @@ func RunS2cTest(rdwr *bufio.ReadWriter, is_extended bool) error {
 
 	// Send the TEST_FINALIZE message that concludes the test
 
-	return WriteJsonMessage(rdwr, MsgTestFinalize, "")
+	return SendSimpleMsg(rdwr.Writer, MsgTestFinalize, "")
 }

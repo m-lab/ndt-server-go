@@ -200,6 +200,8 @@ type SimpleMsg struct {
 	Msg string `json:"msg, string"`
 }
 
+const maxMessageLen int = 0xffff
+
 func ReadMessageJson(brdr *bufio.Reader) (Message, error) {
 	msg, err := ReadMessage(brdr)
 	if err != nil {
@@ -212,8 +214,7 @@ func ReadMessageJson(brdr *bufio.Reader) (Message, error) {
 	}
 	nmsg := Message{}
 	nmsg.Header.MsgType = msg.Header.MsgType
-	// TODO(bassosimone): what is golang equivalent of INT_MAX?
-	if len(simple.Msg) > 0xffff {
+	if len(simple.Msg) > maxMessageLen {
 		panic("unexpected maximum message length")
 	}
 	nmsg.Header.Length = int16(len(simple.Msg))
@@ -253,5 +254,14 @@ func SendJSON(wr *bufio.Writer, t byte, msg interface{}) error {
 		log.Println(err)
 		return err
 	}
+	if len(j) > maxMessageLen {
+		return errors.New("message is too long")
+	}
 	return Send(wr, t, j)
+}
+
+// TODO(bassosimone): shouldn't we use recv/send or read/write?
+
+func SendSimpleMsg(wr *bufio.Writer, t byte, msg string) error {
+	return SendJSON(wr, t, SimpleMsg{Msg: msg})
 }

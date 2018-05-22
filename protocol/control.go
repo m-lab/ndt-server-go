@@ -16,11 +16,11 @@ import (
 */
 
 func update_queue_pos(rdwr *bufio.ReadWriter, position int) error {
-	err := WriteJsonMessage(rdwr, MsgSrvQueue, strconv.Itoa(position))
+	err := SendSimpleMsg(rdwr.Writer, MsgSrvQueue, strconv.Itoa(position))
 	if err != nil {
 		return errors.New("ndt: cannot write SRV_QUEUE message")
 	}
-	err = WriteJsonMessage(rdwr, MsgSrvQueue, SrvQueueHeartbeat)
+	err = SendSimpleMsg(rdwr.Writer, MsgSrvQueue, SrvQueueHeartbeat)
 	if err != nil {
 		return errors.New("ndt: cannot write SRV_QUEUE heartbeat message")
 	}
@@ -101,7 +101,7 @@ func HandleControlConnection(cc net.Conn) {
 
 	// Write queue empty message
 
-	err = WriteJsonMessage(rdwr, MsgSrvQueue, "0")
+	err = SendSimpleMsg(rdwr.Writer, MsgSrvQueue, "0")
 	if err != nil {
 		log.Println("ndt: cannot write SRV_QUEUE message")
 		return
@@ -109,7 +109,7 @@ func HandleControlConnection(cc net.Conn) {
 
 	// Write server version to client
 
-	err = WriteJsonMessage(rdwr, MsgLogin,
+	err = SendSimpleMsg(rdwr.Writer, MsgLogin,
 		"v3.7.0 ("+KvProduct+")")
 	if err != nil {
 		log.Println("ndt: cannot send our version to client")
@@ -131,7 +131,7 @@ func HandleControlConnection(cc net.Conn) {
 	if (status & TestMeta) != 0 {
 		tests_message += strconv.Itoa(int(TestMeta))
 	}
-	err = WriteJsonMessage(rdwr, MsgLogin, tests_message)
+	err = SendSimpleMsg(rdwr.Writer, MsgLogin, tests_message)
 	if err != nil {
 		log.Println("ndt: cannot send the list of tests to client")
 		return
@@ -170,7 +170,7 @@ func HandleControlConnection(cc net.Conn) {
 	 * Until we reach this point, send back a variable that NDT client
 	 * will ignore but that is consistent with what it would expect.
 	 */
-	err = WriteJsonMessage(rdwr, MsgResults,
+	err = SendSimpleMsg(rdwr.Writer, MsgResults,
 		"botticelli_does_not_yet_collect_web100_data_sorry: 1\n")
 	if err != nil {
 		return
@@ -178,7 +178,7 @@ func HandleControlConnection(cc net.Conn) {
 
 	// Send empty MSG_LOGOUT to client
 
-	err = WriteJsonMessage(rdwr, MsgLogout, "")
+	err = SendSimpleMsg(rdwr.Writer, MsgLogout, "")
 	if err != nil {
 		return
 	}

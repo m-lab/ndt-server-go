@@ -21,11 +21,11 @@ func RunMetaTest(rdwr *bufio.ReadWriter) error {
 
 	// Send empty TEST_PREPARE and TEST_START messages to the client
 
-	err := WriteJsonMessage(rdwr, MsgTestPrepare, "")
+	err := SendSimpleMsg(rdwr.Writer, MsgTestPrepare, "")
 	if err != nil {
 		return err
 	}
-	err = WriteJsonMessage(rdwr, MsgTestStart, "")
+	err = SendSimpleMsg(rdwr.Writer, MsgTestStart, "")
 	if err != nil {
 		return err
 	}
@@ -50,5 +50,5 @@ func RunMetaTest(rdwr *bufio.ReadWriter) error {
 
 	// Send empty TEST_FINALIZE to client
 
-	return WriteJsonMessage(rdwr, MsgTestFinalize, "")
+	return SendSimpleMsg(rdwr.Writer, MsgTestFinalize, "")
 }
