@@ -157,23 +157,12 @@ func ReadLogin(brdr *bufio.Reader) (Login, error) {
 		return Login{}, errors.New("not implemented")
 
 	case MsgExtendedLogin: // Handle extended login, i.e. with JSON
-		lj := loginJSON{"foo", "bar"}
+		lj := loginJSON{"foo", "bar"} // Invalid values to catch errors
 		err := json.Unmarshal(msg.Content, &lj)
 		if err != nil {
 			log.Println("Error: ", err)
 			return Login{}, err
 		}
-		// TODO(bassosimone): what is the idiomatic way for this? Do
-		// we need to also check other parts of the code base?
-		//
-		// Or was that caused by the fact that in botticelli I was
-		// passing to Unmarshal a pointer to a pointer?
-		/*
-				in botticelli:
-			if lj == nil {
-				return Login{}, errors.New("received literal null")
-			}
-		*/
 		if lj.Msg == "foo" || lj.Tests == "bar" {
 			return Login{}, errors.New("invalid message")
 		}
