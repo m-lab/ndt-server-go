@@ -2,45 +2,25 @@ package control
 
 import (
 	"bufio"
-	"errors"
 	"github.com/m-lab/ndt-server-go/nettests"
-	"github.com/m-lab/ndt-server-go/protocol"
 	"github.com/m-lab/ndt-server-go/netx"
+	"github.com/m-lab/ndt-server-go/protocol"
 	"log"
 	"net"
 	"strconv"
 	"sync"
-	"time"
 )
 
 /*
 	The control protocol.
 */
 
-func update_queue_pos(rdwr *bufio.ReadWriter, position int) error {
-	err := protocol.SendSimpleMsg(rdwr.Writer, protocol.MsgSrvQueue, strconv.Itoa(position))
-	if err != nil {
-		return errors.New("ndt: cannot write SRV_QUEUE message")
-	}
-	err = protocol.SendSimpleMsg(rdwr.Writer, protocol.MsgSrvQueue, protocol.SrvQueueHeartbeat)
-	if err != nil {
-		return errors.New("ndt: cannot write SRV_QUEUE heartbeat message")
-	}
-	msg, err := protocol.ReadMessageJson(rdwr.Reader)
-	if err != nil {
-		return errors.New("ndt: cannot read MSG_WAITING message")
-	}
-	msgType := msg.Header.MsgType
-	if msgType != protocol.MsgWaiting {
-		return errors.New("ndt: received unexpected message from client")
-	}
-	return nil
-}
+var TestsRunning int = 0
+var TestsRunningMutex sync.Mutex
 
-var kv_test_pending bool = false
-var kv_test_pending_mutex sync.Mutex
+const MaxTestsRunning int = 32
 
-var KvProduct string = "ndt-server-go" // XXX move / change
+const ServerName string = "ndt-server-go"
 
 // HandleControlConnection handles the control connection |cc|.
 func HandleControlConnection(cc net.Conn) {
@@ -71,34 +51,28 @@ func HandleControlConnection(cc net.Conn) {
 		return
 	}
 
-	// Queue management
-	// XXX The current implementation of queue management is minimal, and
-	// possibly also very ugly and stupid. Must be improved.
-	//
-	// Moreover the lock/unlock dance with the mutex is not idiomatic
-	// golang and it would be better to use messages and channels.
+	// Queue management (simplified)
 
-	for {
-		kv_test_pending_mutex.Lock()
-		if !kv_test_pending {
-			kv_test_pending = true
-			kv_test_pending_mutex.Unlock()
-			break
-		}
-		kv_test_pending_mutex.Unlock()
-		err = update_queue_pos(rdwr, 1)
-		if err != nil {
-			log.Println("ndt: failed to update client of its queue position")
-			return
-		}
-		time.Sleep(3.0 * time.Second)
+	canContinue := false
+	TestsRunningMutex.Lock()
+	if TestsRunning < MaxTestsRunning {
+		TestsRunning += 1
+		canContinue = true
 	}
+	TestsRunningMutex.Unlock()
+	if !canContinue {
+		log.Println("ndt: too many running tests")
+		serverBusy := "9988"
+		protocol.SendSimpleMsg(rdwr.Writer, protocol.MsgSrvQueue, serverBusy)
+		return
+	}
+
 	log.Println("ndt: this test is now running")
 	defer func() {
 		log.Println("ndt: test complete; allowing another test to run")
-		kv_test_pending_mutex.Lock()
-		kv_test_pending = false
-		kv_test_pending_mutex.Unlock()
+		TestsRunningMutex.Lock()
+		TestsRunning -= 1
+		TestsRunningMutex.Unlock()
 	}()
 
 	// Write queue empty message
@@ -112,7 +86,7 @@ func HandleControlConnection(cc net.Conn) {
 	// Write server version to client
 
 	err = protocol.SendSimpleMsg(rdwr.Writer, protocol.MsgLogin,
-		"v3.7.0 ("+KvProduct+")")
+		"v3.7.0 ("+ServerName+")")
 	if err != nil {
 		log.Println("ndt: cannot send our version to client")
 		return
