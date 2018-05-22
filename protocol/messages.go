@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"errors"
 	"log"
-	"strconv"
 )
 
 // TODO(gfr): decide where we want to put these files. We probably already
@@ -80,30 +79,4 @@ func WriteJsonMessage(rdwr *bufio.ReadWriter,
 		return err
 	}
 	return write_message_internal(rdwr, message_type, data)
-}
-
-// ExtendedLoginMessage contains the extended-login-message data.
-type ExtendedLoginMessage struct {
-	Msg      string `json:"msg"`
-	TestsStr string `json:"tests"`
-	Tests    TestCode
-}
-
-// ReadExtendedLogin reads the extended loging message from |reader|. You also
-// need to supply |cc| because we need to set the read deadline on it. This
-// function returns a tuple: the extended-loging-message pointer and the error.
-func ReadExtendedLogin(rdwr *bufio.ReadWriter) (
-	*ExtendedLoginMessage, error) {
-	el_msg := &ExtendedLoginMessage{}
-	login, err := ReadLogin(rdwr.Reader)
-	if err != nil {
-		return nil, err
-	}
-	if !login.IsExtended {
-		panic("unexpected message type")
-	}
-	el_msg.Tests = login.Tests
-	el_msg.TestsStr = strconv.Itoa(int(login.Tests))
-	el_msg.Msg = login.Version
-	return el_msg, nil
 }

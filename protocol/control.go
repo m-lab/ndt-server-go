@@ -49,9 +49,9 @@ func HandleControlConnection(cc net.Conn) {
 
 	// Read extended login message
 
-	login_msg, err := ReadExtendedLogin(rdwr)
-	if err != nil {
-		log.Println("ndt: cannot read extended login")
+	login, err := ReadLogin(rdwr.Reader)
+	if err != nil || login.IsExtended == false {
+		log.Println("ndt: cannot read extended login message")
 		return
 	}
 
@@ -118,7 +118,7 @@ func HandleControlConnection(cc net.Conn) {
 
 	// Send list of encoded tests IDs
 
-	status := login_msg.Tests
+	status := login.Tests
 	tests_message := ""
 	if (status & TestS2CExt) != 0 {
 		tests_message += strconv.Itoa(int(TestS2CExt))
