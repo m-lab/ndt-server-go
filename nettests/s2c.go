@@ -92,7 +92,7 @@ func RunS2CTest(rdwr *bufio.ReadWriter, isExtended bool) error {
 			defer conn.Close()
 
 			for {
-				amt, err = writer.Write(outputBuff)
+				amt, err := writer.Write(outputBuff)
 				if err != nil || amt != len(outputBuff) {
 					log.Println("ndt: failed to write to client")
 					break
