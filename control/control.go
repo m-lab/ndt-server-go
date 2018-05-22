@@ -95,19 +95,19 @@ func HandleControlConnection(cc net.Conn) {
 	// Send list of encoded tests IDs
 
 	status := login.Tests
-	tests_message := ""
+	testsMessage := ""
 	if (status & protocol.TestS2CExt) != 0 {
-		tests_message += strconv.Itoa(int(protocol.TestS2CExt))
-		tests_message += " "
+		testsMessage += strconv.Itoa(int(protocol.TestS2CExt))
+		testsMessage += " "
 	}
 	if (status & protocol.TestS2C) != 0 {
-		tests_message += strconv.Itoa(int(protocol.TestS2C))
-		tests_message += " "
+		testsMessage += strconv.Itoa(int(protocol.TestS2C))
+		testsMessage += " "
 	}
 	if (status & protocol.TestMeta) != 0 {
-		tests_message += strconv.Itoa(int(protocol.TestMeta))
+		testsMessage += strconv.Itoa(int(protocol.TestMeta))
 	}
-	err = protocol.SendSimpleMsg(rdwr.Writer, protocol.MsgLogin, tests_message)
+	err = protocol.SendSimpleMsg(rdwr.Writer, protocol.MsgLogin, testsMessage)
 	if err != nil {
 		log.Println("ndt: cannot send the list of tests to client")
 		return
@@ -116,14 +116,14 @@ func HandleControlConnection(cc net.Conn) {
 	// Run tests
 
 	if (status & protocol.TestS2CExt) != 0 {
-		err = nettests.RunS2cTest(rdwr, true)
+		err = nettests.RunS2CTest(rdwr, true)
 		if err != nil {
 			log.Println("ndt: failure to run s2c_ext test")
 			return
 		}
 	}
 	if (status & protocol.TestS2C) != 0 {
-		err = nettests.RunS2cTest(rdwr, false)
+		err = nettests.RunS2CTest(rdwr, false)
 		if err != nil {
 			log.Println("ndt: failure running s2c test")
 			return

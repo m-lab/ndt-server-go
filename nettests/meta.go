@@ -3,7 +3,7 @@ package nettests
 import (
 	"bufio"
 	"errors"
-  "github.com/m-lab/ndt-server-go/protocol"
+	"github.com/m-lab/ndt-server-go/protocol"
 	"log"
 )
 
