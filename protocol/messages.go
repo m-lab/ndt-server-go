@@ -107,13 +107,3 @@ func ReadExtendedLogin(rdwr *bufio.ReadWriter) (
 	el_msg.Msg = login.Version
 	return el_msg, nil
 }
-
-// WriteRaWstring writes |str| on |rdwr|.
-func WriteRawString(rdwr *bufio.ReadWriter, str string) error {
-	log.Printf("ndt: write raw string: '%s'", str)
-	_, err := rdwr.Writer.WriteString(str)
-	if err != nil {
-		return err
-	}
-	return rdwr.Writer.Flush()
-}

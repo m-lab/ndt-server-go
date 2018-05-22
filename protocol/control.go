@@ -57,9 +57,15 @@ func HandleControlConnection(cc net.Conn) {
 
 	// Write kickoff message
 
-	err = WriteRawString(rdwr, "123456 654321")
-	if err != nil {
+	kickoff := "123456 654321"
+	count, err := rdwr.Writer.WriteString(kickoff)
+	if err != nil || count != len(kickoff) {
 		log.Println("ndt: cannot write kickoff message")
+		return
+	}
+	err = rdwr.Writer.Flush()
+	if err != nil {
+		log.Println("ndt: cannot flush kickoff message")
 		return
 	}
 
