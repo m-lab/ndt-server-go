@@ -12,7 +12,6 @@ import (
 func RunMetaTest(rdwr *bufio.ReadWriter) error {
 
 	// Send empty TEST_PREPARE and TEST_START messages to the client
-
 	err := protocol.SendSimpleMsg(rdwr.Writer, protocol.MsgTestPrepare, "")
 	if err != nil {
 		return err
@@ -23,7 +22,6 @@ func RunMetaTest(rdwr *bufio.ReadWriter) error {
 	}
 
 	// Read a sequence of TEST_MSGs from client
-
 	for {
 		msg, err := protocol.ReadMessageJson(rdwr.Reader)
 		if err != nil {
@@ -41,6 +39,5 @@ func RunMetaTest(rdwr *bufio.ReadWriter) error {
 	}
 
 	// Send empty TEST_FINALIZE to client
-
 	return protocol.SendSimpleMsg(rdwr.Writer, protocol.MsgTestFinalize, "")
 }

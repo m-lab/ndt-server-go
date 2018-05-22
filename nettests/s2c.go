@@ -49,7 +49,6 @@ func RunS2CTest(rdwr *bufio.ReadWriter, isExtended bool) error {
 	}
 
 	// Wait for client(s) to connect
-
 	nstreams := 1
 	if isExtended {
 		nstreams = numParallelStreams
@@ -65,14 +64,12 @@ func RunS2CTest(rdwr *bufio.ReadWriter, isExtended bool) error {
 	}
 
 	// Send empty TEST_START message to tell the client to start
-
 	err = protocol.SendSimpleMsg(rdwr.Writer, protocol.MsgTestStart, "")
 	if err != nil {
 		return err
 	}
 
 	// Run the N streams in parallel
-
 	channel := make(chan int64)
 
 	gen := util.NewBytesGenerator()
@@ -82,13 +79,8 @@ func RunS2CTest(rdwr *bufio.ReadWriter, isExtended bool) error {
 	for idx := 0; idx < len(conns); idx += 1 {
 		log.Printf("ndt: start stream with id %d\n", idx)
 
-		// Note: rather than creating and destroying the goroutine
-		// always it would be more considerate to just have a few
-		// already active goroutines to which to dispatch the message
-		// that there is a specific connection to be served
-
+		// Send the buffer to the client for about ten seconds
 		go func(conn net.Conn) {
-			// Send the buffer to the client for about ten seconds
 			// TODO: here we should take `web100` snapshots
 
 			writer := bufio.NewWriter(netx.NewDeadlineConn(conn))
@@ -130,7 +122,6 @@ func RunS2CTest(rdwr *bufio.ReadWriter, isExtended bool) error {
 	elapsed := time.Since(start)
 
 	// Send message containing what we measured
-
 	speedKbits := (8.0 * float64(bytesSent)) / 1000.0 / elapsed.Seconds()
 	message := &s2cMessage{
 		ThroughputValue:  strconv.FormatFloat(speedKbits, 'f', -1, 64),
@@ -147,7 +138,6 @@ func RunS2CTest(rdwr *bufio.ReadWriter, isExtended bool) error {
 	}
 
 	// Receive message from client containing its measured speed
-
 	msg, err := protocol.ReadMessageJson(rdwr.Reader)
 	if err != nil {
 		return err
@@ -163,6 +153,5 @@ func RunS2CTest(rdwr *bufio.ReadWriter, isExtended bool) error {
 	// on the client side should work anyway, however.
 
 	// Send the TEST_FINALIZE message that concludes the test
-
 	return protocol.SendSimpleMsg(rdwr.Writer, protocol.MsgTestFinalize, "")
 }

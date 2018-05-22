@@ -11,16 +11,11 @@ import (
 	"sync"
 )
 
-/*
-	The control protocol.
-*/
+var testsRunning int = 0
+var testsRunningMutex sync.Mutex
 
-var TestsRunning int = 0
-var TestsRunningMutex sync.Mutex
-
-const MaxTestsRunning int = 32
-
-const ServerName string = "ndt-server-go"
+const maxTestsRunning int = 32
+const serverName string = "ndt-server-go"
 
 // HandleControlConnection handles the control connection |cc|.
 func HandleControlConnection(cc net.Conn) {
@@ -30,7 +25,6 @@ func HandleControlConnection(cc net.Conn) {
 	rdwr := bufio.NewReadWriter(bufio.NewReader(cc), bufio.NewWriter(cc))
 
 	// Read extended login message
-
 	login, err := protocol.ReadLogin(rdwr.Reader)
 	if err != nil || login.IsExtended == false {
 		log.Println("ndt: cannot read extended login message")
@@ -38,7 +32,6 @@ func HandleControlConnection(cc net.Conn) {
 	}
 
 	// Write kickoff message
-
 	kickoff := "123456 654321"
 	count, err := rdwr.Writer.WriteString(kickoff)
 	if err != nil || count != len(kickoff) {
@@ -52,14 +45,13 @@ func HandleControlConnection(cc net.Conn) {
 	}
 
 	// Queue management (simplified)
-
 	canContinue := false
-	TestsRunningMutex.Lock()
-	if TestsRunning < MaxTestsRunning {
-		TestsRunning += 1
+	testsRunningMutex.Lock()
+	if testsRunning < maxTestsRunning {
+		testsRunning += 1
 		canContinue = true
 	}
-	TestsRunningMutex.Unlock()
+	testsRunningMutex.Unlock()
 	if !canContinue {
 		log.Println("ndt: too many running tests")
 		serverBusy := "9988"
@@ -70,13 +62,12 @@ func HandleControlConnection(cc net.Conn) {
 	log.Println("ndt: this test is now running")
 	defer func() {
 		log.Println("ndt: test complete; allowing another test to run")
-		TestsRunningMutex.Lock()
-		TestsRunning -= 1
-		TestsRunningMutex.Unlock()
+		testsRunningMutex.Lock()
+		testsRunning -= 1
+		testsRunningMutex.Unlock()
 	}()
 
 	// Write queue empty message
-
 	err = protocol.SendSimpleMsg(rdwr.Writer, protocol.MsgSrvQueue, "0")
 	if err != nil {
 		log.Println("ndt: cannot write SRV_QUEUE message")
@@ -84,16 +75,14 @@ func HandleControlConnection(cc net.Conn) {
 	}
 
 	// Write server version to client
-
 	err = protocol.SendSimpleMsg(rdwr.Writer, protocol.MsgLogin,
-		"v3.7.0 ("+ServerName+")")
+		"v3.7.0 ("+serverName+")")
 	if err != nil {
 		log.Println("ndt: cannot send our version to client")
 		return
 	}
 
 	// Send list of encoded tests IDs
-
 	status := login.Tests
 	testsMessage := ""
 	if (status & protocol.TestS2CExt) != 0 {
@@ -114,7 +103,6 @@ func HandleControlConnection(cc net.Conn) {
 	}
 
 	// Run tests
-
 	if (status & protocol.TestS2CExt) != 0 {
 		err = nettests.RunS2CTest(rdwr, true)
 		if err != nil {
@@ -138,7 +126,6 @@ func HandleControlConnection(cc net.Conn) {
 	}
 
 	// Send MSG_RESULTS to the client
-
 	/*
 	 * TODO: Here we should actually send results but to do that we need
 	 * first to implement reading Web100 variables from /proc/web100.
@@ -153,7 +140,6 @@ func HandleControlConnection(cc net.Conn) {
 	}
 
 	// Send empty MSG_LOGOUT to client
-
 	err = protocol.SendSimpleMsg(rdwr.Writer, protocol.MsgLogout, "")
 	if err != nil {
 		return
