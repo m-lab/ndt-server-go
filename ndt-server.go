@@ -341,3 +341,7 @@ func main() {
 		log.Fatal(err)
 	}
 }
+
+// TODO: Add TLS support
+// TODO: Add prometheus monitoring
+// TODO: Make sure gorilla is not enabling compression
