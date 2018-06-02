@@ -162,6 +162,13 @@ func makeNdtUpgrader(protocols []string) websocket.Upgrader {
 		ReadBufferSize:  8192,
 		WriteBufferSize: 8192,
 		Subprotocols:    protocols,
+		CheckOrigin: func(r *http.Request) bool {
+			// TODO: make this check more appropriate -- added to get initial html5 widget to work.
+			for k, v := range r.Header {
+				log.Println("Header", k, v)
+			}
+			return true
+		},
 	}
 }
 
@@ -331,16 +338,17 @@ func manageS2cTest(ws *websocket.Conn) float64 {
 	sendNdtMessage(TestStart, []byte(""), ws)
 	s2cRate := <-testResponder.response_channel
 	sendPreformattedNdtMessage(TestMsg,
-		[]byte(fmt.Sprintf("{ \"ThroughputValue\": %.4f, \"UnsentDataAmount\": 0, \"TotalSentByte\": %d }",
+		[]byte(fmt.Sprintf("{ \"ThroughputValue\": %.4f, \"UnsentDataAmount\": 0, \"TotalSentByte\": %d}",
 			s2cRate, int64(s2cRate*10*100/8))), ws)
 	clientRateMsg := readJSONMessage(ws, TestMsg)
 	log.Println("The client sent us:", clientRateMsg.msg)
 	requiredWeb100Vars := []string{"AckPktsIn", "CountRTT", "CongestionSignals", "CurRTO", "CurMSS",
 		"DataBytesOut", "DupAcksIn", "MaxCwnd", "MaxRwinRcvd", "PktsOut", "PktsRetrans", "RcvWinScale",
-		"Sndbuf", "SndLimTimeCwnd", "SndLimTimeRwin", "SndLimTimeSender", "SndWinScale", "SumRTT", "Timeouts"}
+		"Sndbuf", "SndLimTimeCwnd", "SndLimTimeRwin", "SndLimTimeSender", "SndWinScale", "SumRTT", "Timeouts",
+		"MaxRTT", "MinRTT"}
 
 	for _, web100Var := range requiredWeb100Vars {
-		sendNdtMessage(TestMsg, []byte(web100Var+":0"), ws)
+		sendNdtMessage(TestMsg, []byte(web100Var+": 0"), ws)
 	}
 	sendNdtMessage(TestFinalize, []byte(""), ws)
 	clientRate, err := strconv.ParseFloat(clientRateMsg.msg, 64)
@@ -420,6 +428,7 @@ You can monitor its status on port :9090/metrics.
 func main() {
 	flag.Parse()
 	http.HandleFunc("/", DefaultHandler)
+	http.Handle("/static/", http.StripPrefix("/static", http.FileServer(http.Dir("html"))))
 	http.Handle("/ndt_protocol",
 		promhttp.InstrumentHandlerInFlight(currentTests,
 			promhttp.InstrumentHandlerDuration(testDuration,
