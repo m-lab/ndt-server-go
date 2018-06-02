@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log"
 	"math/rand"
+	"net"
 	"net/http"
 	"strconv"
 	"strings"
@@ -59,7 +60,7 @@ var (
 			Help: "A histogram of request latencies.",
 			// Durations will likely be tri-modal: early failures (fast),
 			// completed single test (slower), completed dual tests (slowest).
-			Buckets: []float64{.01, .1, 1, 10, 12, 20, 22, 30, 180},
+			Buckets: []float64{.01, .1, 1, 10, 12, 20, 22, 30, 60, 180},
 		},
 		[]string{"code"},
 	)
@@ -78,10 +79,24 @@ func init() {
 	prometheus.MustRegister(testCount)
 }
 
-// TODO: Create separate listener to fix race when starting test servers.
-// listener, err := net.Listen("tcp", ":8080")
-// if err != nil { log.Fatal(err) }
-// go serveMux.Serve(listener, nil)
+// Note: Copied from net/http package.
+// tcpKeepAliveListener sets TCP keep-alive timeouts on accepted
+// connections. It's used by ListenAndServe and ListenAndServeTLS so
+// dead TCP connections (e.g. closing laptop mid-download) eventually
+// go away.
+type tcpKeepAliveListener struct {
+	*net.TCPListener
+}
+
+func (ln tcpKeepAliveListener) Accept() (net.Conn, error) {
+	tc, err := ln.AcceptTCP()
+	if err != nil {
+		return nil, err
+	}
+	tc.SetKeepAlive(true)
+	tc.SetKeepAlivePeriod(3 * time.Minute)
+	return tc, nil
+}
 
 func readMessage(ws *websocket.Conn, expectedType byte) []byte {
 	_, buffer, err := ws.ReadMessage()
@@ -244,13 +259,20 @@ func manageC2sTest(ws *websocket.Conn) float64 {
 		time.Sleep(2 * time.Minute)
 		s.Close()
 	}()
+	defer s.Close()
+	ln, err := net.Listen("tcp", s.Addr)
+	if err != nil {
+		log.Println("Failed to listen on:", s.Addr, err)
+		return -1
+	}
+	defer ln.Close()
 	go func() {
 		log.Println("About to listen for C2S on", socketPort)
-		err := s.ListenAndServeTLS(*certFile, *keyFile)
+		// err := s.ListenAndServeTLS(*certFile, *keyFile)
+		err := s.ServeTLS(tcpKeepAliveListener{ln.(*net.TCPListener)}, *certFile, *keyFile)
 		log.Println("C2S listening ended with error", err)
 	}()
 
-	defer s.Close()
 	// Tell the client to go
 	sendNdtMessage(TestPrepare, []byte(strconv.Itoa(int(socketPort))), ws)
 	c2sReady := <-testResponder.response_channel
@@ -287,11 +309,18 @@ func manageS2cTest(ws *websocket.Conn) float64 {
 		s.Close()
 	}()
 	defer s.Close()
+	ln, err := net.Listen("tcp", s.Addr)
+	if err != nil {
+		log.Println("Failed to listen on:", s.Addr, err)
+		return -1
+	}
+	defer ln.Close()
 	go func() {
 		log.Println("About to listen for S2C on", socketPort)
-		err := s.ListenAndServeTLS(*certFile, *keyFile)
+		err := s.ServeTLS(tcpKeepAliveListener{ln.(*net.TCPListener)}, *certFile, *keyFile)
 		log.Println("S2C listening ended with error", err)
 	}()
+
 	// Tell the client to go
 	sendNdtMessage(TestPrepare, []byte(strconv.Itoa(int(socketPort))), ws)
 	s2cReady := <-testResponder.response_channel
