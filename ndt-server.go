@@ -43,8 +43,15 @@ const (
 
 // Flags that can be passed in on the command line
 var (
-	NdtPort = flag.String("port", "3010", "The port to use for the main NDT test")
+	NdtPort  = flag.String("port", "3010", "The port to use for the main NDT test")
+	certFile = flag.String("cert", "", "The file with server certificates in PEM format.")
+	keyFile  = flag.String("key", "", "The file with server key in PEM format.")
 )
+
+// TODO: Create separate listener to fix race when starting test servers.
+// listener, err := net.Listen("tcp", ":8080")
+// if err != nil { log.Fatal(err) }
+// go serveMux.Serve(listener, nil)
 
 func readMessage(ws *websocket.Conn, expectedType byte) []byte {
 	_, buffer, err := ws.ReadMessage()
@@ -197,7 +204,7 @@ func manageC2sTest(ws *websocket.Conn) float64 {
 	}()
 	go func() {
 		log.Println("About to listen for C2S on", socketPort)
-		err := s.ListenAndServe()
+		err := s.ListenAndServeTLS(*certFile, *keyFile)
 		log.Println("C2S listening ended with error", err)
 	}()
 
@@ -236,7 +243,7 @@ func manageS2cTest(ws *websocket.Conn) float64 {
 	defer s.Close()
 	go func() {
 		log.Println("About to listen for S2C on", socketPort)
-		err := s.ListenAndServe()
+		err := s.ListenAndServeTLS(*certFile, *keyFile)
 		log.Println("S2C listening ended with error", err)
 	}()
 	// Tell the client to go
@@ -336,7 +343,7 @@ func main() {
 	http.HandleFunc("/", DefaultHandler)
 	http.HandleFunc("/ndt_protocol", NdtServer)
 	log.Println("About to listen on " + *NdtPort + ". Go to http://127.0.0.1:" + *NdtPort + "/")
-	err := http.ListenAndServe(":"+*NdtPort, nil)
+	err := http.ListenAndServeTLS(":"+*NdtPort, *certFile, *keyFile, nil)
 	if err != nil {
 		log.Fatal(err)
 	}
