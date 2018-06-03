@@ -6,7 +6,6 @@ import (
 	"flag"
 	"fmt"
 	"log"
-	"math/rand"
 	"net"
 	"net/http"
 	"strconv"
@@ -52,40 +51,65 @@ var (
 
 var (
 	currentTests = prometheus.NewGauge(prometheus.GaugeOpts{
-		Name: "ndt_current_tests",
-		Help: "A gauge of requests currently being served by the wrapped handler.",
+		Name: "ndt_control_current",
+		Help: "A gauge of requests currently being served by the NDT control handler.",
 	})
 	testDuration = prometheus.NewHistogramVec(
 		prometheus.HistogramOpts{
-			Name: "ndt_request_duration_seconds",
-			Help: "A histogram of request latencies.",
+			Name: "ndt_control_duration_seconds",
+			Help: "A histogram of request latencies to the control channel.",
 			// Durations will likely be tri-modal: early failures (fast),
 			// completed single test (slower), completed dual tests (slowest).
-			Buckets: []float64{.01, .1, 1, 10, 12, 20, 22, 30, 60, 180},
+			Buckets: []float64{.1, 1, 10, 11, 12, 13, 14, 15, 17, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 60, 180},
 		},
 		[]string{"code"},
 	)
-	testC2SCount = prometheus.NewCounterVec(
+	testRate = prometheus.NewHistogramVec(
+		prometheus.HistogramOpts{
+			Name: "ndt_test_rate_mbps",
+			Help: "A histogram of request rates.",
+			Buckets: []float64{
+				1, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55, 60, 65, 70, 75, 80, 85, 90, 95, 100,
+				110, 120, 130, 140, 150, 160, 170, 180, 190, 200,
+				220, 240, 260, 280, 300,
+				333, 366, 400,
+				450, 500,
+				600, 700, 800, 900, 1000},
+		},
+		[]string{"direction"},
+	)
+	testCount = prometheus.NewCounterVec(
 		prometheus.CounterOpts{
-			Name: "ndt_c2s_tests_total",
-			Help: "Number of c2s NDT tests run by this server.",
+			Name: "ndt_test_total",
+			Help: "Number of NDT tests run by this server.",
 		},
-		[]string{"code"},
+		[]string{"direction", "code"},
 	)
-	testS2CCount = prometheus.NewCounterVec(
-		prometheus.CounterOpts{
-			Name: "ndt_s2c_tests_total",
-			Help: "Number of s2c NDT tests run by this server.",
-		},
-		[]string{"code"},
-	)
+	/*
+		testC2SCount = prometheus.NewCounterVec(
+			prometheus.CounterOpts{
+				Name: "ndt_c2s_tests_total",
+				Help: "Number of c2s NDT tests run by this server.",
+			},
+			[]string{"code"},
+		)
+		testS2CCount = prometheus.NewCounterVec(
+			prometheus.CounterOpts{
+				Name: "ndt_s2c_tests_total",
+				Help: "Number of s2c NDT tests run by this server.",
+			},
+			[]string{"code"},
+		)
+	*/
 )
 
 func init() {
 	prometheus.MustRegister(currentTests)
 	prometheus.MustRegister(testDuration)
-	prometheus.MustRegister(testC2SCount)
-	prometheus.MustRegister(testS2CCount)
+	// prometheus.MustRegister(testC2SCount)
+	// prometheus.MustRegister(testS2CCount)
+	prometheus.MustRegister(testCount)
+	prometheus.MustRegister(testRate)
 }
 
 // Note: Copied from net/http package.
@@ -174,14 +198,16 @@ func makeNdtUpgrader(protocols []string) websocket.Upgrader {
 		EnableCompression: false,
 		CheckOrigin: func(r *http.Request) bool {
 			// TODO: make this check more appropriate -- added to get initial html5 widget to work.
-			log.Println("Origin:", r.Header.Get("Origin"))
+			// log.Println("Origin:", r.Header.Get("Origin"))
 			return true
 		},
 	}
 }
 
+// TestResponder coordinates synchronization between the main control loop and subtests.
 type TestResponder struct {
-	response_channel chan float64
+	response chan float64
+	port     int
 }
 
 // S2CTestServer performs the NDT s2c test.
@@ -190,7 +216,7 @@ func (tr *TestResponder) S2CTestServer(w http.ResponseWriter, r *http.Request) {
 	ws, err := upgrader.Upgrade(w, r, nil)
 	if err != nil {
 		// Upgrade should have already returned an HTTP error code.
-		log.Println(err)
+		log.Println(tr.port, "ERROR S2C: upgrader", err)
 		return
 	}
 	defer ws.Close()
@@ -198,21 +224,21 @@ func (tr *TestResponder) S2CTestServer(w http.ResponseWriter, r *http.Request) {
 	for i := range dataToSend {
 		dataToSend[i] = byte(((i * 101) % (122 - 33)) + 33)
 	}
-	tr.response_channel <- S2cReady
+	tr.response <- S2cReady
 	totalBytes := float64(0)
 	startTime := time.Now()
 	endTime := startTime.Add(10 * time.Second)
-	log.Println("S2C: Test starts at", time.Now(), "and ends at", endTime)
+	log.Println(tr.port, "S2C: Test starts at", time.Now().Format(time.RFC3339), "and ends in", (10 * time.Second))
 	for time.Now().Before(endTime) {
 		err := ws.WriteMessage(websocket.BinaryMessage, dataToSend)
 		if err != nil {
-			log.Println(err)
+			log.Println(tr.port, "ERROR S2C: readmessage", err)
 			return
 		}
 		totalBytes += float64(len(dataToSend))
 	}
 	megabitsPerSecond := float64(8) * totalBytes / float64(1000) / float64(time.Since(startTime)/time.Second)
-	tr.response_channel <- megabitsPerSecond
+	tr.response <- megabitsPerSecond
 }
 
 // C2STestServer performs the NDT c2s test.
@@ -221,39 +247,45 @@ func (tr *TestResponder) C2STestServer(w http.ResponseWriter, r *http.Request) {
 	ws, err := upgrader.Upgrade(w, r, nil)
 	if err != nil {
 		// Upgrade should have already returned an HTTP error code.
-		log.Println(err)
+		log.Println(tr.port, "ERROR C2S: upgrader", err)
 		return
 	}
 	defer ws.Close()
-	tr.response_channel <- C2sReady
+	tr.response <- C2sReady
 	totalBytes := float64(0)
 	startTime := time.Now()
 	endTime := startTime.Add(10 * time.Second)
-	log.Println("C2S: Test starts at", time.Now(), "and ends at", endTime)
+	log.Println(tr.port, "C2S: Test starts at", time.Now().Format(time.RFC3339), "and ends in", (10 * time.Second))
+	i := 0
 	for time.Now().Before(endTime) {
+		// if i%200 == 0 {
+		// log.Println("C2S: ReadMessage at", time.Now().Format(time.RFC3339))
+		// }
 		_, buffer, err := ws.ReadMessage()
 		if err != nil {
-			log.Println(err)
+			log.Println(tr.port, "ERROR C2S: readmessage", err)
 			return
 		}
 		totalBytes += float64(len(buffer))
+		i++
 	}
 	megabitsPerSecond := float64(8) * totalBytes / float64(1000) / float64(time.Since(startTime)/time.Second)
-	tr.response_channel <- megabitsPerSecond
+	log.Println(tr.port, "C2S: Reporting rate:", megabitsPerSecond)
+	tr.response <- megabitsPerSecond
 
-	ticker := time.NewTicker(2 * time.Second)
+	ticker := time.NewTicker(4 * time.Second)
 	defer ticker.Stop()
 	done := make(chan bool)
 
 	// TODO: does this need to be 10s?
 	// Drain the buffer for another ten seconds
 	go func() {
-		endTime = time.Now().Add(2 * time.Second)
+		endTime = time.Now().Add(4 * time.Second)
 		for time.Now().Before(endTime) {
 			//log.Println("reading second message")
 			_, _, err := ws.ReadMessage()
 			if err != nil {
-				//log.Println("returning due to error in second read:", err)
+				// log.Println("ERROR C2S: returning due to error in second read:", err)
 				done <- true
 				return
 			}
@@ -261,32 +293,34 @@ func (tr *TestResponder) C2STestServer(w http.ResponseWriter, r *http.Request) {
 		}
 		done <- true
 	}()
+	ts := time.Now()
+	log.Println(tr.port, "C2S: Waiting for reader or ticker")
 	select {
 	case <-done:
 		// fmt.Println("Done!")
 		break
-	case _ = <-ticker.C:
+	case <-ticker.C:
 		//fmt.Println("Current time: ", t)
 		break
 	}
+	log.Println(tr.port, "C2S: wait time", time.Now().Sub(ts))
 }
 
 func manageC2sTest(ws *websocket.Conn) float64 {
 	// Choose a high valued socket #
-	socketPort := rand.Int31n(1000) + 10000
+	// socketPort := rand.Int31n(1000) + 10000
 	// Open the socket
 	serveMux := http.NewServeMux()
 	testResponder := &TestResponder{
-		response_channel: make(chan float64),
+		response: make(chan float64),
 	}
-	// testCount.WithLabelValues("c2s", "ok").Inc()
-	fmt.Println("c2s")
 	serveMux.HandleFunc("/ndt_protocol",
 		promhttp.InstrumentHandlerCounter(
-			testC2SCount, http.HandlerFunc(testResponder.C2STestServer)))
+			testCount.MustCurryWith(prometheus.Labels{"direction": "c2s"}),
+			http.HandlerFunc(testResponder.C2STestServer)))
 	// Start listening
 	s := http.Server{
-		Addr:    ":" + strconv.Itoa(int(socketPort)),
+		Addr:    ":0", // let OS randomly select port.
 		Handler: serveMux,
 	}
 	/*go func() {
@@ -298,28 +332,34 @@ func manageC2sTest(ws *websocket.Conn) float64 {
 	}()*/
 	defer s.Shutdown(context.Background())
 	// defer s.Close() // Shutdown(context.Background())
+
 	ln, err := net.Listen("tcp", s.Addr)
 	if err != nil {
-		log.Println("C2S: Failed to listen on:", s.Addr, err)
+		log.Println(ws.RemoteAddr(), "ERROR C2S: Failed to listen on:", s.Addr, err)
 		return -1
 	}
 	defer ln.Close()
+	c2sServerPort := ln.Addr().(*net.TCPAddr).Port
 	go func() {
-		log.Println("C2S: About to listen for C2S on", socketPort)
+		// log.Println("C2S: About to listen for C2S on", socketPort)
+		log.Println(c2sServerPort, "C2S: About to listen for C2S on", ln.Addr())
 		// err := s.ListenAndServeTLS(*certFile, *keyFile)
-		err := s.ServeTLS(tcpKeepAliveListener{ln.(*net.TCPListener)}, *certFile, *keyFile)
-		log.Println("C2S: listening ended with error", err)
+		// time.Sleep(2 * time.Second)
+		_ = s.ServeTLS(tcpKeepAliveListener{ln.(*net.TCPListener)}, *certFile, *keyFile)
+		// log.Println("C2S: listening ended with error", err)
 	}()
+	testResponder.port = c2sServerPort
 
 	// Tell the client to go
-	sendNdtMessage(TestPrepare, []byte(strconv.Itoa(int(socketPort))), ws)
-	c2sReady := <-testResponder.response_channel
+	// sendNdtMessage(TestPrepare, []byte(strconv.Itoa(int(socketPort))), ws)
+	sendNdtMessage(TestPrepare, []byte(strconv.Itoa(c2sServerPort)), ws)
+	c2sReady := <-testResponder.response
 	if c2sReady != C2sReady {
-		log.Println("C2S: Bad value received on the c2s channel", c2sReady)
+		log.Println(c2sServerPort, "ERROR C2S: Bad value received on the c2s channel", c2sReady)
 		return -1
 	}
 	sendNdtMessage(TestStart, []byte(""), ws)
-	c2sRate := <-testResponder.response_channel
+	c2sRate := <-testResponder.response
 	sendNdtMessage(TestMsg, []byte(fmt.Sprintf("%.4f", c2sRate)), ws)
 	sendNdtMessage(TestFinalize, []byte(""), ws)
 	return c2sRate
@@ -327,20 +367,20 @@ func manageC2sTest(ws *websocket.Conn) float64 {
 
 func manageS2cTest(ws *websocket.Conn) float64 {
 	// Choose a high valued socket #
-	socketPort := rand.Int31n(1000) + 10000
+	// socketPort := rand.Int31n(1000) + 10000
 	// Open the socket
 	serveMux := http.NewServeMux()
 	testResponder := &TestResponder{
-		response_channel: make(chan float64),
+		response: make(chan float64),
 	}
-	fmt.Println("s2c")
 	serveMux.HandleFunc("/ndt_protocol",
 		promhttp.InstrumentHandlerCounter(
-			testS2CCount, http.HandlerFunc(testResponder.S2CTestServer)))
+			testCount.MustCurryWith(prometheus.Labels{"direction": "s2c"}),
+			http.HandlerFunc(testResponder.S2CTestServer)))
 	// serveMux.HandleFunc("/ndt_protocol", testResponder.S2CTestServer)
 	// Start listening
 	s := http.Server{
-		Addr:    ":" + strconv.Itoa(int(socketPort)),
+		Addr:    ":0", // let OS randomly select port. + strconv.Itoa(int(socketPort)),
 		Handler: serveMux,
 	}
 	go func() {
@@ -354,26 +394,29 @@ func manageS2cTest(ws *websocket.Conn) float64 {
 		return -1
 	}
 	defer ln.Close()
+	s2cServerPort := ln.Addr().(*net.TCPAddr).Port
+	testResponder.port = s2cServerPort
 	go func() {
-		log.Println("S2C: About to listen for S2C on", socketPort)
-		err := s.ServeTLS(tcpKeepAliveListener{ln.(*net.TCPListener)}, *certFile, *keyFile)
-		log.Println("S2C: listening ended with error", err)
+		log.Println(s2cServerPort, "S2C: About to listen for S2C on", s2cServerPort)
+		// time.Sleep(2 * time.Second)
+		_ = s.ServeTLS(tcpKeepAliveListener{ln.(*net.TCPListener)}, *certFile, *keyFile)
+		// log.Println("S2C: listening ended with error", err)
 	}()
 
 	// Tell the client to go
-	sendNdtMessage(TestPrepare, []byte(strconv.Itoa(int(socketPort))), ws)
-	s2cReady := <-testResponder.response_channel
+	sendNdtMessage(TestPrepare, []byte(strconv.Itoa(int(s2cServerPort))), ws)
+	s2cReady := <-testResponder.response
 	if s2cReady != S2cReady {
-		log.Println("S2C: Bad value received on the s2c channel", s2cReady)
+		log.Println(s2cServerPort, "S2C: Bad value received on the s2c channel", s2cReady)
 		return -1
 	}
 	sendNdtMessage(TestStart, []byte(""), ws)
-	s2cRate := <-testResponder.response_channel
+	s2cRate := <-testResponder.response
 	sendPreformattedNdtMessage(TestMsg,
 		[]byte(fmt.Sprintf("{ \"ThroughputValue\": %.4f, \"UnsentDataAmount\": 0, \"TotalSentByte\": %d}",
 			s2cRate, int64(s2cRate*10*100/8))), ws)
 	clientRateMsg := readJSONMessage(ws, TestMsg)
-	log.Println("S2C: The client sent us:", clientRateMsg.msg)
+	log.Println(s2cServerPort, "S2C: The client sent us:", clientRateMsg.msg)
 	requiredWeb100Vars := []string{"AckPktsIn", "CountRTT", "CongestionSignals", "CurRTO", "CurMSS",
 		"DataBytesOut", "DupAcksIn", "MaxCwnd", "MaxRwinRcvd", "PktsOut", "PktsRetrans", "RcvWinScale",
 		"Sndbuf", "SndLimTimeCwnd", "SndLimTimeRwin", "SndLimTimeSender", "SndWinScale", "SumRTT", "Timeouts",
@@ -385,10 +428,11 @@ func manageS2cTest(ws *websocket.Conn) float64 {
 	sendNdtMessage(TestFinalize, []byte(""), ws)
 	clientRate, err := strconv.ParseFloat(clientRateMsg.msg, 64)
 	if err != nil {
-		log.Println("S2C: Bad client rate:", err)
+		log.Println(s2cServerPort, "S2C: Bad client rate:", err)
 		return -1
 	}
-	return clientRate
+	log.Println(s2cServerPort, "S2C: client rate:", clientRate, "vs", s2cRate)
+	return s2cRate // clientRate
 }
 
 func runMetaTest(ws *websocket.Conn) {
@@ -409,7 +453,8 @@ func NdtServer(w http.ResponseWriter, r *http.Request) {
 	upgrader := makeNdtUpgrader([]string{"ndt"})
 	ws, err := upgrader.Upgrade(w, r, nil)
 	if err != nil {
-		log.Fatal(err)
+		log.Println("ERROR SERVER:", err)
+		return
 	}
 	defer ws.Close()
 
@@ -437,9 +482,15 @@ func NdtServer(w http.ResponseWriter, r *http.Request) {
 	var c2sRate, s2cRate float64
 	if run_c2s {
 		c2sRate = manageC2sTest(ws)
+		if c2sRate > 0 {
+			testRate.WithLabelValues("c2s").Observe(c2sRate / 1000.0)
+		}
 	}
 	if run_s2c {
 		s2cRate = manageS2cTest(ws)
+		if s2cRate > 0 {
+			testRate.WithLabelValues("s2c").Observe(s2cRate / 1000.0)
+		}
 	}
 
 	sendNdtMessage(MsgResults, []byte(fmt.Sprintf("You uploaded at %.4f and downloaded at %.4f", c2sRate, s2cRate)), ws)
@@ -467,10 +518,13 @@ func main() {
 		mux.HandleFunc("/debug/pprof/profile", pprof.Profile)
 		mux.HandleFunc("/debug/pprof/symbol", pprof.Symbol)
 		mux.HandleFunc("/debug/pprof/trace", pprof.Trace)
-		go func() {
-			log.Fatal(http.ListenAndServe(":9090", mux))
-		}()
 	*/
+
+	go func() {
+		mux := http.NewServeMux()
+		mux.Handle("/metrics", promhttp.Handler())
+		log.Fatal(http.ListenAndServe(":9090", mux))
+	}()
 
 	http.HandleFunc("/", DefaultHandler)
 	http.Handle("/static/", http.StripPrefix("/static", http.FileServer(http.Dir("html"))))
@@ -478,7 +532,6 @@ func main() {
 		promhttp.InstrumentHandlerInFlight(currentTests,
 			promhttp.InstrumentHandlerDuration(testDuration,
 				http.HandlerFunc(NdtServer))))
-	http.Handle("/metrics", promhttp.Handler())
 
 	log.Println("About to listen on " + *NdtPort + ". Go to http://127.0.0.1:" + *NdtPort + "/")
 	err := http.ListenAndServeTLS(":"+*NdtPort, *certFile, *keyFile, nil)
