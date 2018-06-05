@@ -126,8 +126,7 @@ func RecvBinaryMessage(brdr *bufio.Reader) (Message, error) {
 		log.Println(err)
 		return Message{}, err
 	}
-	// TODO(bassosimone): what is the Go idiomatic way of having a logger
-	// with different logging levels (this is probably LOG_DEBUG)?
+	// TODO(bassosimone): improve logging (see issue #27)
 	log.Printf("ndt: message body: '%s'\n", content)
 	return Message{hdr, content}, nil
 }
@@ -157,13 +156,13 @@ func RecvLogin(brdr *bufio.Reader) (Login, error) {
 		return Login{}, errors.New("not implemented")
 
 	case MsgExtendedLogin: // Handle extended login, i.e. with JSON
-		lj := loginJSON{"foo", "bar"} // Invalid values to catch errors
+		lj := loginJSON{"", ""}
 		err := json.Unmarshal(msg.Content, &lj)
 		if err != nil {
 			log.Println("Error: ", err)
 			return Login{}, err
 		}
-		if lj.Msg == "foo" || lj.Tests == "bar" {
+		if lj.Msg == "" || lj.Tests == "" {
 			return Login{}, errors.New("invalid message")
 		}
 		tests, err := strconv.Atoi(lj.Tests)
@@ -205,6 +204,8 @@ func RecvJSONMessage(brdr *bufio.Reader) (Message, error) {
 	nmsg := Message{}
 	nmsg.Header.MsgType = msg.Header.MsgType
 	if len(simple.Msg) > maxMessageLen {
+		// Here we panic because the maximum message length is 16 bit hence
+		// simple.Msg cannot be bigger than maxMessageLen
 		panic("unexpected maximum message length")
 	}
 	nmsg.Header.Length = int16(len(simple.Msg))
