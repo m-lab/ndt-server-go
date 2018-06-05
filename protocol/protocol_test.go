@@ -24,7 +24,7 @@ func TestReadMessage(t *testing.T) {
 	buf.Write([]byte{11, 0, byte(len(m))})
 	buf.WriteString(m)
 
-	msg, err := protocol.ReadMessage(bufio.NewReader(buf))
+	msg, err := protocol.RecvBinaryMessage(bufio.NewReader(buf))
 	if err != nil {
 		t.Error(err.Error())
 		return
@@ -46,7 +46,7 @@ func TestReadMany(t *testing.T) {
 
 	reader := bufio.NewReader(buf)
 
-	msg, err := protocol.ReadMessage(reader)
+	msg, err := protocol.RecvBinaryMessage(reader)
 	if err != nil {
 		t.Error(err.Error())
 		return
@@ -55,7 +55,7 @@ func TestReadMany(t *testing.T) {
 		t.Error("Wrong content length: ", len(msg.Content))
 	}
 
-	msg, err = protocol.ReadMessage(reader)
+	msg, err = protocol.RecvBinaryMessage(reader)
 	if err != nil {
 		t.Error(err.Error())
 		return
@@ -65,13 +65,13 @@ func TestReadMany(t *testing.T) {
 	}
 }
 
-func TestReadLogin11(t *testing.T) {
+func TestRecvLogin11(t *testing.T) {
 	buf := bytes.NewBuffer(make([]byte, 0, 200))
 	msg := "{\"msg\": \"4.0.0.1\", \"tests\": \"63\"}"
 	buf.Write([]byte{11, 0, byte(len(msg))})
 	buf.WriteString(msg)
 
-	login, err := protocol.ReadLogin(bufio.NewReader(buf))
+	login, err := protocol.RecvLogin(bufio.NewReader(buf))
 	if err != nil {
 		t.Error(err.Error())
 	}
@@ -89,7 +89,7 @@ func TestReadLogin11(t *testing.T) {
 func TestWriteMessage(t *testing.T) {
 	outputBuf := bytes.NewBuffer(make([]byte, 0, 200))
 	biow := bufio.NewWriter(outputBuf)
-	err := protocol.Send(biow, 4, []byte("abcdef"))
+	err := protocol.SendBinaryMessage(biow, 4, []byte("abcdef"))
 	if err != nil {
 		t.Error(err.Error())
 	}
