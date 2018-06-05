@@ -11,6 +11,7 @@ import (
 	"errors"
 	"io"
 	"log"
+	"math"
 	"strconv"
 )
 
@@ -87,8 +88,8 @@ const (
 )
 
 type header struct {
-	MsgType byte // The message type
-	Length  int16
+	MsgType byte   // The message type
+	Length  uint16 // The message len
 }
 
 // Message contains a header and arbitrary content.
@@ -187,7 +188,7 @@ type simpleMsg struct {
 	Msg string `json:"msg, string"`
 }
 
-const maxMessageLen int = 0xffff
+const maxMessageLen uint16 = math.MaxUint16
 
 // RecvJSONMessage receives a JSON message. A JSON message is a binary NDT
 // message where the message body is a serialized JSON.
@@ -203,12 +204,13 @@ func RecvJSONMessage(brdr *bufio.Reader) (Message, error) {
 	}
 	nmsg := Message{}
 	nmsg.Header.MsgType = msg.Header.MsgType
+	// This check is here to make sure that we can safely cast `len(simple.Msg)`
+	// to `uint16` below without truncation or overflow. It's a panic because we
+	// should already checked in ReadBinaryMessage that the cast is possible.
 	if len(simple.Msg) > maxMessageLen {
-		// Here we panic because the maximum message length is 16 bit hence
-		// simple.Msg cannot be bigger than maxMessageLen
 		panic("unexpected maximum message length")
 	}
-	nmsg.Header.Length = int16(len(simple.Msg))
+	nmsg.Header.Length = uint16(len(simple.Msg))
 	// TODO(bassosimone): this is a string copy according to golang's blog [1]
 	// and perhaps we may see whether we can avoid making these copies by
 	// simplifying further the code. Otherwise, we can measure and see whether
