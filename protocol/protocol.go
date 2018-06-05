@@ -188,7 +188,7 @@ type simpleMsg struct {
 	Msg string `json:"msg, string"`
 }
 
-const maxMessageLen uint16 = math.MaxUint16
+const maxMessageLen int = math.MaxUint16
 
 // RecvJSONMessage receives a JSON message. A JSON message is a binary NDT
 // message where the message body is a serialized JSON.
