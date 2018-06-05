@@ -103,9 +103,9 @@ type Message struct {
 // to the binary protocol, e.g. when WebSockets is used.
 var ErrIllegalMessageHeader = errors.New("Illegal Message Header")
 
-// ReadMessage reads a NDT message from |brdr|. Returns the message and/or the
-// error that occurred while reading such message.
-func ReadMessage(brdr *bufio.Reader) (Message, error) {
+// RecvBinaryMessage reads a binary NDT message from |brdr|. Returns the message
+// and/or the error that occurred while reading such message.
+func RecvBinaryMessage(brdr *bufio.Reader) (Message, error) {
 	// Implementation note: we use a buffered reader, so we're robust to
 	// the case in which we receive a batch of messages.
 	var hdr header
@@ -144,9 +144,9 @@ type Login struct {
 	IsExtended bool     // Type MsgExtendedLogin
 }
 
-// ReadLogin reads the initial login message.
-func ReadLogin(brdr *bufio.Reader) (Login, error) {
-	msg, err := ReadMessage(brdr)
+// RecvLogin reads the initial login message.
+func RecvLogin(brdr *bufio.Reader) (Login, error) {
+	msg, err := RecvBinaryMessage(brdr)
 	if err != nil {
 		return Login{}, err
 	}
@@ -184,19 +184,20 @@ func ReadLogin(brdr *bufio.Reader) (Login, error) {
 	}
 }
 
-// SimpleMsg helps encoding json messages.
-type SimpleMsg struct {
+type simpleMsg struct {
 	Msg string `json:"msg, string"`
 }
 
 const maxMessageLen int = 0xffff
 
-func ReadMessageJson(brdr *bufio.Reader) (Message, error) {
-	msg, err := ReadMessage(brdr)
+// RecvJSONMessage receives a JSON message. A JSON message is a binary NDT
+// message where the message body is a serialized JSON.
+func RecvJSONMessage(brdr *bufio.Reader) (Message, error) {
+	msg, err := RecvBinaryMessage(brdr)
 	if err != nil {
 		return Message{}, err
 	}
-	simple := &SimpleMsg{}
+	simple := &simpleMsg{}
 	err = json.Unmarshal(msg.Content, &simple)
 	if err != nil {
 		return Message{}, err
@@ -213,8 +214,8 @@ func ReadMessageJson(brdr *bufio.Reader) (Message, error) {
 	return nmsg, nil
 }
 
-// Send sends a raw message to the client.
-func Send(wr *bufio.Writer, t byte, msg []byte) error {
+// SendBinaryMessage sends a binary NDT message to the client.
+func SendBinaryMessage(wr *bufio.Writer, t byte, msg []byte) error {
 	// Implementation note: here we could also use a net.Conn and a
 	// buffer backed by a char slice. However, since we're coding the
 	// protocol reader to be a *bufio.Reader, it would probably be
@@ -236,8 +237,7 @@ func Send(wr *bufio.Writer, t byte, msg []byte) error {
 	return wr.Flush()
 }
 
-// SendJSON sends a json encoded message to the client.
-func SendJSON(wr *bufio.Writer, t byte, msg interface{}) error {
+func sendJSONMessage(wr *bufio.Writer, t byte, msg interface{}) error {
 	j, err := json.Marshal(msg)
 	if err != nil {
 		log.Println(err)
@@ -246,11 +246,11 @@ func SendJSON(wr *bufio.Writer, t byte, msg interface{}) error {
 	if len(j) > maxMessageLen {
 		return errors.New("message is too long")
 	}
-	return Send(wr, t, j)
+	return SendBinaryMessage(wr, t, j)
 }
 
-// TODO(bassosimone): shouldn't we use recv/send or read/write?
-
-func SendSimpleMsg(wr *bufio.Writer, t byte, msg string) error {
-	return SendJSON(wr, t, SimpleMsg{Msg: msg})
+// SendSimpleJSONMessage sends a simple JSON message. That is a JSON object
+// containing a single string called `msg`.
+func SendSimpleJSONMessage(wr *bufio.Writer, t byte, msg string) error {
+	return sendJSONMessage(wr, t, simpleMsg{Msg: msg})
 }

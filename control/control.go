@@ -24,9 +24,13 @@ func HandleControlConnection(cc net.Conn) {
 	rdwr := bufio.NewReadWriter(bufio.NewReader(cc), bufio.NewWriter(cc))
 
 	// Read extended login message
-	login, err := protocol.ReadLogin(rdwr.Reader)
-	if err != nil || login.IsExtended == false {
+	login, err := protocol.RecvLogin(rdwr.Reader)
+	if err != nil {
 		log.Println("ndt: cannot read extended login message")
+		return
+	}
+	if login.IsExtended == false {
+		log.Println("ndt: binary messages not supported")
 		return
 	}
 
@@ -43,7 +47,12 @@ func HandleControlConnection(cc net.Conn) {
 		return
 	}
 
-	// Queue management (simplified)
+	// Queue management (simplified). The original NDT used to queue incoming
+	// clients with parallelism greater than a threshold. We now have mlabns and
+	// so we can do better; i.e., we can route clients to minimize load. Hence,
+	// the decision to avoid implementing a queue here. Smart clients should
+	// probably use the `geo_options` policy of mlabns and try with another server
+	// when a specific server bounces them.
 	canContinue := false
 	testsRunningMutex.Lock()
 	if testsRunning < maxTestsRunning {
@@ -53,7 +62,7 @@ func HandleControlConnection(cc net.Conn) {
 	testsRunningMutex.Unlock()
 	if !canContinue {
 		log.Println("ndt: too many running tests")
-		protocol.SendSimpleMsg(rdwr.Writer, protocol.MsgSrvQueue, protocol.SrvQueueServerBusy)
+		protocol.SendSimpleJSONMessage(rdwr.Writer, protocol.MsgSrvQueue, protocol.SrvQueueServerBusy)
 		return
 	}
 
@@ -66,14 +75,14 @@ func HandleControlConnection(cc net.Conn) {
 	}()
 
 	// Write queue empty message
-	err = protocol.SendSimpleMsg(rdwr.Writer, protocol.MsgSrvQueue, "0")
+	err = protocol.SendSimpleJSONMessage(rdwr.Writer, protocol.MsgSrvQueue, "0")
 	if err != nil {
 		log.Println("ndt: cannot write SRV_QUEUE message")
 		return
 	}
 
 	// Write server version to client
-	err = protocol.SendSimpleMsg(rdwr.Writer, protocol.MsgLogin, "v3.7.0 ("+serverName+")")
+	err = protocol.SendSimpleJSONMessage(rdwr.Writer, protocol.MsgLogin, "v3.7.0 ("+serverName+")")
 	if err != nil {
 		log.Println("ndt: cannot send our version to client")
 		return
@@ -93,7 +102,7 @@ func HandleControlConnection(cc net.Conn) {
 	if (status & protocol.TestMeta) != 0 {
 		testsMessage += strconv.Itoa(int(protocol.TestMeta))
 	}
-	err = protocol.SendSimpleMsg(rdwr.Writer, protocol.MsgLogin, testsMessage)
+	err = protocol.SendSimpleJSONMessage(rdwr.Writer, protocol.MsgLogin, testsMessage)
 	if err != nil {
 		log.Println("ndt: cannot send the list of tests to client")
 		return
@@ -103,21 +112,20 @@ func HandleControlConnection(cc net.Conn) {
 	// TODO(bassosimone): not yet implemented
 
 	// Send MSG_RESULTS to the client
-	/*
-	 * TODO: Here we should actually send results but to do that we need
-	 * first to implement reading Web100 variables from /proc/web100.
-	 *
-	 * Until we reach this point, send back a variable that NDT client
-	 * will ignore but that is consistent with what it would expect.
-	 */
-	err = protocol.SendSimpleMsg(rdwr.Writer, protocol.MsgResults,
-		"botticelli_does_not_yet_collect_web100_data_sorry: 1\n")
+	//
+	// TODO(bassosimone): Here we should actually send results but to do that we
+	// need first to implement reading Web100 variables from /proc/web100.
+	//
+	// Until we reach this point, send back a variable that NDT client
+	// will ignore but that is consistent with what it would expect.
+	err = protocol.SendSimpleJSONMessage(rdwr.Writer, protocol.MsgResults,
+		"web100_supported: 0\n")
 	if err != nil {
 		return
 	}
 
 	// Send empty MSG_LOGOUT to client
-	err = protocol.SendSimpleMsg(rdwr.Writer, protocol.MsgLogout, "")
+	err = protocol.SendSimpleJSONMessage(rdwr.Writer, protocol.MsgLogout, "")
 	if err != nil {
 		return
 	}
