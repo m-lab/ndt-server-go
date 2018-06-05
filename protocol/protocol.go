@@ -208,8 +208,12 @@ func RecvJSONMessage(brdr *bufio.Reader) (Message, error) {
 		panic("unexpected maximum message length")
 	}
 	nmsg.Header.Length = int16(len(simple.Msg))
-	// TODO(bassosimone): understand whether this is a string copy and
-	// if we can avoid this copy by using other types.
+	// TODO(bassosimone): this is a string copy according to golang's blog [1]
+	// and perhaps we may see whether we can avoid making these copies by
+	// simplifying further the code. Otherwise, we can measure and see whether
+	// this is a performance issue or not (I don't believe it is).
+	//
+	// [1] https://blog.golang.org/slices
 	nmsg.Content = []byte(simple.Msg)
 	return nmsg, nil
 }
