@@ -19,6 +19,9 @@ import (
 // TestCode is used to decode the tests bitvector.
 type TestCode int
 
+// TODO(bassosimone): we should probably also have a define for the
+// type of message that we can receive rather than using `byte`
+
 // Message types. Note: compared to the original specification, I have added
 // the `Msg` prefix to all messages not having it for clarity. Also, the
 // TEST_MSG define is mapped onto the MsgTest constant.
@@ -78,7 +81,7 @@ const (
 	// SrvQueueServerFault indicates that the session must be terminated.
 	SrvQueueServerFault = "9977"
 	// SrvQueueServerBusy indicates that the server is busy.
-	SrvQueueServerBusy = "9987"
+	SrvQueueServerBusy = "9988"
 	// SrvQueueServerBusy60s indicates that a server is busy for > 60 s.
 	SrvQueueServerBusy60s = "9999"
 )
@@ -111,8 +114,11 @@ func ReadMessage(brdr *bufio.Reader) (Message, error) {
 		log.Println(err)
 		return Message{}, err
 	}
-	log.Println(hdr)
+	log.Printf("ndt: message type: %d", hdr.MsgType)
+	log.Printf("ndt: message length: %d", hdr.Length)
 	content := make([]byte, hdr.Length)
+	// TODO(bassosimone): discuss with @gfr10598 whether here it makes
+	// sense to use a BigEndian reader since we're reading bytes.
 	err = binary.Read(brdr, binary.BigEndian, content)
 	// TODO(bassosimone): decide whether we want to tolerate EOF (it
 	// seems to me the original protocol does not).
@@ -120,6 +126,9 @@ func ReadMessage(brdr *bufio.Reader) (Message, error) {
 		log.Println(err)
 		return Message{}, err
 	}
+	// TODO(bassosimone): what is the Go idiomatic way of having a logger
+	// with different logging levels (this is probably LOG_DEBUG)?
+	log.Printf("ndt: message body: '%s'\n", content)
 	return Message{hdr, content}, nil
 }
 
@@ -130,9 +139,9 @@ type loginJSON struct {
 
 // Login represents a client login message.
 type Login struct {
-	Tests      byte   // The client test bits
-	Version    string // The client version string
-	IsExtended bool   // Type MsgExtendedLogin
+	Tests      TestCode // The client test bits
+	Version    string   // The client version string
+	IsExtended bool     // Type MsgExtendedLogin
 }
 
 // ReadLogin reads the initial login message.
@@ -147,21 +156,28 @@ func ReadLogin(brdr *bufio.Reader) (Login, error) {
 		// TODO(bassosimone): Handle legacy, without json
 		return Login{}, errors.New("not implemented")
 
-	case MsgExtendedLogin:
-		// Handle extended, with json
-		lj := loginJSON{"foo", "bar"}
+	case MsgExtendedLogin: // Handle extended login, i.e. with JSON
+		lj := loginJSON{"foo", "bar"} // Invalid values to catch errors
 		err := json.Unmarshal(msg.Content, &lj)
 		if err != nil {
 			log.Println("Error: ", err)
+			return Login{}, err
+		}
+		if lj.Msg == "foo" || lj.Tests == "bar" {
+			return Login{}, errors.New("invalid message")
 		}
 		tests, err := strconv.Atoi(lj.Tests)
 		if err != nil {
 			log.Println("Error: ", err)
+			return Login{}, err
 		}
-		// TODO(bassosimone): handle the case where some of
-		// the fields were not part of the incoming msg.
-		return Login{byte(tests), lj.Msg, true}, err
-
+		log.Printf("ndt: client version: %s", lj.Msg)
+		log.Printf("ndt: test suite: %s", lj.Tests)
+		login := Login{TestCode(tests), lj.Msg, true}
+		if (login.Tests & TestStatus) == 0 {
+			return Login{}, errors.New("missing TEST_STATUS")
+		}
+		return login, nil
 	default:
 		log.Println("Unhandled message type (WebSockets?)")
 		return Login{}, errors.New("unhandled message type")
@@ -171,6 +187,30 @@ func ReadLogin(brdr *bufio.Reader) (Login, error) {
 // SimpleMsg helps encoding json messages.
 type SimpleMsg struct {
 	Msg string `json:"msg, string"`
+}
+
+const maxMessageLen int = 0xffff
+
+func ReadMessageJson(brdr *bufio.Reader) (Message, error) {
+	msg, err := ReadMessage(brdr)
+	if err != nil {
+		return Message{}, err
+	}
+	simple := &SimpleMsg{}
+	err = json.Unmarshal(msg.Content, &simple)
+	if err != nil {
+		return Message{}, err
+	}
+	nmsg := Message{}
+	nmsg.Header.MsgType = msg.Header.MsgType
+	if len(simple.Msg) > maxMessageLen {
+		panic("unexpected maximum message length")
+	}
+	nmsg.Header.Length = int16(len(simple.Msg))
+	// TODO(bassosimone): understand whether this is a string copy and
+	// if we can avoid this copy by using other types.
+	nmsg.Content = []byte(simple.Msg)
+	return nmsg, nil
 }
 
 // Send sends a raw message to the client.
@@ -203,5 +243,14 @@ func SendJSON(wr *bufio.Writer, t byte, msg interface{}) error {
 		log.Println(err)
 		return err
 	}
+	if len(j) > maxMessageLen {
+		return errors.New("message is too long")
+	}
 	return Send(wr, t, j)
+}
+
+// TODO(bassosimone): shouldn't we use recv/send or read/write?
+
+func SendSimpleMsg(wr *bufio.Writer, t byte, msg string) error {
+	return SendJSON(wr, t, SimpleMsg{Msg: msg})
 }
