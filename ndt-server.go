@@ -1,7 +1,6 @@
 package main
 
 import (
-	"context"
 	"encoding/json"
 	"flag"
 	"fmt"
@@ -307,8 +306,6 @@ func (tr *TestResponder) C2STestServer(w http.ResponseWriter, r *http.Request) {
 }
 
 func manageC2sTest(ws *websocket.Conn) float64 {
-	// Choose a high valued socket #
-	// socketPort := rand.Int31n(1000) + 10000
 	// Open the socket
 	serveMux := http.NewServeMux()
 	testResponder := &TestResponder{
@@ -330,8 +327,7 @@ func manageC2sTest(ws *websocket.Conn) float64 {
 		s.Close()
 		log.Println("Done closing c2s")
 	}()*/
-	defer s.Shutdown(context.Background())
-	// defer s.Close() // Shutdown(context.Background())
+	defer s.Close()
 
 	ln, err := net.Listen("tcp", s.Addr)
 	if err != nil {
@@ -366,8 +362,6 @@ func manageC2sTest(ws *websocket.Conn) float64 {
 }
 
 func manageS2cTest(ws *websocket.Conn) float64 {
-	// Choose a high valued socket #
-	// socketPort := rand.Int31n(1000) + 10000
 	// Open the socket
 	serveMux := http.NewServeMux()
 	testResponder := &TestResponder{
@@ -380,14 +374,16 @@ func manageS2cTest(ws *websocket.Conn) float64 {
 	// serveMux.HandleFunc("/ndt_protocol", testResponder.S2CTestServer)
 	// Start listening
 	s := http.Server{
-		Addr:    ":0", // let OS randomly select port. + strconv.Itoa(int(socketPort)),
+		Addr:    ":0", // let OS randomly select port.
 		Handler: serveMux,
 	}
-	go func() {
-		time.Sleep(2 * time.Minute)
-		s.Close()
-	}()
-	defer s.Shutdown(context.Background())
+	/*
+		go func() {
+			time.Sleep(2 * time.Minute)
+			s.Close()
+		}()
+	*/
+	defer s.Close()
 	ln, err := net.Listen("tcp", s.Addr)
 	if err != nil {
 		log.Println("S2C: Failed to listen on:", s.Addr, err)
