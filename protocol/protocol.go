@@ -118,8 +118,6 @@ func RecvBinaryMessage(brdr *bufio.Reader) (Message, error) {
 	log.Printf("ndt: message type: %d", hdr.MsgType)
 	log.Printf("ndt: message length: %d", hdr.Length)
 	content := make([]byte, hdr.Length)
-	// TODO(bassosimone): discuss with @gfr10598 whether here it makes
-	// sense to use a BigEndian reader since we're reading bytes.
 	err = binary.Read(brdr, binary.BigEndian, content)
 	// TODO(bassosimone): decide whether we want to tolerate EOF (it
 	// seems to me the original protocol does not).
@@ -206,15 +204,13 @@ func RecvJSONMessage(brdr *bufio.Reader) (Message, error) {
 	nmsg.Header.MsgType = msg.Header.MsgType
 	// This check is here to make sure that we can safely cast `len(simple.Msg)`
 	// to `uint16` below without truncation or overflow. It's a panic because we
-	// should already checked in ReadBinaryMessage that the cast is possible.
+	// should already checked in RecvBinaryMessage that the cast is possible.
 	if len(simple.Msg) > maxMessageLen {
 		panic("unexpected maximum message length")
 	}
 	nmsg.Header.Length = uint16(len(simple.Msg))
-	// TODO(bassosimone): this is a string copy according to golang's blog [1]
-	// and perhaps we may see whether we can avoid making these copies by
-	// simplifying further the code. Otherwise, we can measure and see whether
-	// this is a performance issue or not (I don't believe it is).
+	// This is a string copy according to golang's blog [1], however it is
+	// probably smater to not worry about this until we profile a live system.
 	//
 	// [1] https://blog.golang.org/slices
 	nmsg.Content = []byte(simple.Msg)

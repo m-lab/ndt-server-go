@@ -114,7 +114,7 @@ func HandleControlConnection(cc net.Conn) {
 	// Send MSG_RESULTS to the client
 	//
 	// TODO(bassosimone): Here we should actually send results but to do that we
-	// need first to implement reading Web100 variables from /proc/web100.
+	// need first to implement reading tcp_info variables.
 	//
 	// Until we reach this point, send back a variable that NDT client
 	// will ignore but that is consistent with what it would expect.
